@@ -27,7 +27,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             // MyFirstAppTheme 안에 카운터 앱을 만듭니다.
-            // git push and pull test
+            // git push and pull test from N to P
+            // git push and pull test from P to N
             RoutinerTheme {
                 MainScreen()
             }
