@@ -4,6 +4,12 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateIntAsState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
@@ -13,10 +19,14 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.example.Routiner.ui.theme.RoutinerTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.material.ripple.rememberRipple
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.kizitonwose.calendar.core.*
 import com.kizitonwose.calendar.compose.*
 import java.time.YearMonth
@@ -65,22 +75,43 @@ fun MainScreen() {
 
         Spacer(modifier = Modifier.height(18.dp)) // 사이에 공간을 둡니다.
 
-        HorizontalCalendar(
-            state = state,
-            dayContent = { Day(it) }
-        )
+        Box (
+            modifier = Modifier
+                .background(Color.DarkGray)
+        ) {
+            HorizontalCalendar(
+                state = state,
+                dayContent = { Day(it) }
+            )
+        }
     }
 
 
 }
 @Composable
 fun Day(day: CalendarDay) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+
+    val fontSizeState by animateIntAsState(
+        targetValue = if (isPressed) 18 else 16,
+        label = "press_scale_animation"
+    )
+
     Box(
         modifier = Modifier
-            .aspectRatio(1f), // This is important for square sizing!
+            .aspectRatio(1f) // This is important for square sizing!
+            .clickable (
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = { println("dd") }
+            ),
         contentAlignment = Alignment.Center
     ) {
-        Text(text = day.date.dayOfMonth.toString())
+        Text(
+            text = day.date.dayOfMonth.toString(),
+            fontSize = fontSizeState.sp
+        )
     }
 }
 
