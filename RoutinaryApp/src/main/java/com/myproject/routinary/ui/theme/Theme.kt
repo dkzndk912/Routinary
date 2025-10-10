@@ -1,4 +1,4 @@
-package com.example.Routiner.ui.theme
+package com.myproject.routinary.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme

@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.Routiner"
+    namespace = "com.myproject.routinary"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.test"
+        applicationId = "com.myproject.routinary"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
@@ -49,6 +49,9 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.compiler)
+    implementation(libs.androidx.room.ktx)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
     implementation(libs.compose)
     testImplementation(libs.junit)

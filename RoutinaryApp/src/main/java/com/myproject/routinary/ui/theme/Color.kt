@@ -1,4 +1,4 @@
-package com.example.Routiner.ui.theme
+package com.myproject.routinary.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

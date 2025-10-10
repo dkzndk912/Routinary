@@ -19,5 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Routiner"
-include(":RoutinerApp")
+rootProject.name = "Routinary"
+include(":RoutinaryApp")

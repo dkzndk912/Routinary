@@ -1,4 +1,4 @@
-package com.example.Routiner
+package com.myproject.routinary
 
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4

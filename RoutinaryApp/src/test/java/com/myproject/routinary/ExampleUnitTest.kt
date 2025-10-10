@@ -1,4 +1,4 @@
-package com.example.Routiner
+package com.myproject.routinary
 
 import org.junit.Test
 
