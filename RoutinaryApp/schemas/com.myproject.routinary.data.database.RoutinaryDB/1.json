@@ -1,0 +1,31 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "44c9863c64dea9b8d951f131c986d391",
+    "entities": [
+      {
+        "tableName": "Date",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`dateID` TEXT NOT NULL, PRIMARY KEY(`dateID`))",
+        "fields": [
+          {
+            "fieldPath": "dateID",
+            "columnName": "dateID",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "dateID"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '44c9863c64dea9b8d951f131c986d391')"
+    ]
+  }
+}

@@ -2,6 +2,8 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    id("com.google.devtools.ksp")
+    id("com.google.dagger.hilt.android")
 }
 
 android {
@@ -18,6 +20,17 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    ksp {
+        arg("room.schemaLocation", "$projectDir/schemas") // 💡 이 줄을 추가합니다.
+    }
+
+    packaging {
+        // 중복되는 리소스 파일을 무시하도록 설정합니다.
+        resources {
+            excludes += "META-INF/gradle/incremental.annotation.processors"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -27,6 +40,7 @@ android {
             )
         }
     }
+
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_11
@@ -49,10 +63,18 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
-    implementation(libs.androidx.room.runtime)
-    implementation(libs.androidx.room.compiler)
-    implementation(libs.androidx.room.ktx)
+    implementation(libs.room.runtime)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.hilt.android)
+    implementation(libs.androidx.hilt.navigation.compose)
+    implementation(libs.javapoet)
+    implementation(libs.hilt.android.gradle.plugin)
+    ksp(libs.room.compiler)
+    ksp(libs.hilt.compiler)
+    implementation(libs.room.ktx)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
+    ksp(libs.dagger.compiler)
     implementation(libs.compose)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
