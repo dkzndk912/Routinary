@@ -14,7 +14,7 @@ class DateRepository @Inject constructor(private val dateDao: DateDao) {
     val allDates: Flow<List<RoutinaryDate>> = dateDao.getAllDates()
 
     // DAO의 삽입 함수를 호출합니다.
-    suspend fun insert(date: RoutinaryDate) {
+    suspend fun insert(date: RoutinaryDate): Boolean {
         val currentMaxNumber : Int? = dateDao.getMaxNumber()
         val nextNumber : Int = if (currentMaxNumber == null) {
             0
@@ -22,8 +22,13 @@ class DateRepository @Inject constructor(private val dateDao: DateDao) {
             currentMaxNumber + 1
         }
 
-        val newEntry = date.copy(numbering = nextNumber)
-        dateDao.insertDate(date)
+        if (null == dateDao.getDateIDById(date.dateID)) {
+            val newEntry = date.copy(numbering = nextNumber)
+            dateDao.insertDate(newEntry)
+            return true
+        } else {
+            return false
+        }
     }
 
     suspend fun deleteAll() {

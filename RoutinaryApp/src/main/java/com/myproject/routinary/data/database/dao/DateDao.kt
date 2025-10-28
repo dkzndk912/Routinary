@@ -21,5 +21,8 @@ interface DateDao {
     @Query("DELETE FROM RoutinaryDate") // 4. 삭제 쿼리
     suspend fun deleteAll()
 
+    @Query("SELECT dateID FROM RoutinaryDate WHERE dateID = :id LIMIT 1")
+    suspend fun getDateIDById(id: String): String?
+
     // @Update, @Delete 등 다른 어노테이션도 사용 가능
 }

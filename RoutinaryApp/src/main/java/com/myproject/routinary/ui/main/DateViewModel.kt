@@ -5,11 +5,15 @@ import androidx.lifecycle.viewModelScope
 import com.myproject.routinary.data.database.entity.RoutinaryDate
 import com.myproject.routinary.data.database.repository.DateRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -27,6 +31,10 @@ class DateViewModel @Inject constructor (private val repository: DateRepository)
             initialValue = emptyList()
         )
 
+    private val _isDateAdded = MutableStateFlow<Boolean?>(null)
+    val isDateAdded: StateFlow<Boolean?> = _isDateAdded.asStateFlow()
+
+
     fun createDateID() : String {
         val date = Date()
         val sdf = SimpleDateFormat("yyyyMMdd")
@@ -40,8 +48,14 @@ class DateViewModel @Inject constructor (private val repository: DateRepository)
     fun addNewDate(dateID : String) {
         // 비동기 작업을 위해 viewModelScope 코루틴을 사용
         viewModelScope.launch {
-            val newDate = RoutinaryDate(dateID = dateID)
-            repository.insert(newDate) // Repository에 데이터 삽입 요청
+            // withContext(Dispatchers.IO)를 사용하여 비동기 I/O 작업을 수행
+            val result = withContext(Dispatchers.IO) {
+                val newDate = RoutinaryDate(dateID = dateID)
+                // Repository의 insert 함수는 suspend 함수여야 합니다.
+                repository.insert(newDate)
+            }
+
+            _isDateAdded.value = result
         }
     }
 
@@ -49,5 +63,9 @@ class DateViewModel @Inject constructor (private val repository: DateRepository)
         viewModelScope.launch {
             repository.deleteAll() // Repository에 데이터 삽입 요청
         }
+    }
+
+    fun setIsDateAddedNull() {
+        _isDateAdded.value = null
     }
 }
