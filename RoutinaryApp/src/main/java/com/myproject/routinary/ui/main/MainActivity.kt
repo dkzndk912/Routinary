@@ -18,9 +18,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.myproject.routinary.ui.theme.RoutinerTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -35,7 +37,9 @@ import com.myproject.routinary.data.database.entity.RoutinaryDate
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
+import java.time.LocalDate
 import java.time.YearMonth
+import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 
@@ -64,6 +68,8 @@ fun MainScreen(
 //     userList의 값이 변경되면 이 Composable이 자동으로 재구성(Recompose)됩니다.
     val dateList: List<RoutinaryDate> by dateViewModel.allDates.collectAsStateWithLifecycle()
     val isDateIDAdded by dateViewModel.isDateAdded.collectAsState()
+
+    val localDateMap: Map<LocalDate, Boolean> = dateListToLocalDateMap(dateList)
 
     // 1. 다이얼로그(글쓰기 화면)의 표시 여부를 관리하는 상태
     var showWritingScreen by remember { mutableStateOf(false) }
@@ -127,7 +133,7 @@ fun MainScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
 
-                Calendar()
+                Calendar(localDateMap)
 
                 Row (
                     horizontalArrangement = Arrangement.SpaceAround,
@@ -189,29 +195,19 @@ fun MainScreen(
 }
 
 @Composable
-fun Day(day: CalendarDay) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-
-    val fontSizeState by animateIntAsState(
-        targetValue = if (isPressed) 18 else 16,
-        label = "press_scale_animation"
-    )
-
+fun Day(day: CalendarDay, isSelected: Boolean, hasDate: Boolean, onClick: (CalendarDay) -> Unit) {
     Box(
         modifier = Modifier
-            .aspectRatio(1f) // This is important for square sizing!
-            .clickable (
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = { println("dd") }
+            .aspectRatio(1f)
+            .clip(CircleShape)
+            .background(color = if (isSelected || hasDate) Color.Green else Color.Transparent)
+            .clickable(
+                enabled = day.position == DayPosition.MonthDate,
+                onClick = { onClick(day) }
             ),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = day.date.dayOfMonth.toString(),
-            fontSize = fontSizeState.sp
-        )
+        Text(text = day.date.dayOfMonth.toString())
     }
 }
 
@@ -229,7 +225,7 @@ fun DaysOfWeekTitle(daysOfWeek: List<DayOfWeek>) {
 }
 
 @Composable
-fun Calendar() {
+fun Calendar(localDateMap : Map<LocalDate, Boolean>) {
     val currentMonth = remember { YearMonth.now() }
     val startMonth = remember { currentMonth.minusMonths(100) } // Adjust as needed
     val endMonth = remember { currentMonth.plusMonths(100) } // Adjust as needed
@@ -243,6 +239,8 @@ fun Calendar() {
         firstDayOfWeek = daysOfWeek.first()
     )
 
+    var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
+
     Column(
         // modifier: UI 요소의 크기, 여백 등을 설정합니다.
         modifier = Modifier
@@ -254,6 +252,7 @@ fun Calendar() {
     ) {
         // 3. Text: 화면에 숫자를 표시하는 위젯입니다.
         Text(text = "캘린더", style = MaterialTheme.typography.headlineLarge)
+        Text(text = currentMonth.toString(), style = MaterialTheme.typography.headlineLarge)
 
         Spacer(modifier = Modifier.height(18.dp)) // 사이에 공간을 둡니다.
         DaysOfWeekTitle(daysOfWeek = daysOfWeek)
@@ -263,7 +262,11 @@ fun Calendar() {
         ) {
             HorizontalCalendar(
                 state = state,
-                dayContent = { Day(it) }
+                dayContent = { day ->
+                    Day(day, isSelected = selectedDate == day.date, hasDate = localDateMap[day.date]?:false) { day ->
+                        selectedDate = if (selectedDate == day.date) null else day.date
+                    }
+                }
             )
         }
     }
@@ -335,12 +338,23 @@ fun WritingSheetContent(
     }
 }
 
-@Preview(showBackground = true)
-@Composable
-fun CalendarPreview() {
-    RoutinerTheme {
-        Calendar()
+//@Preview(showBackground = true)
+//@Composable
+//fun CalendarPreview() {
+//    RoutinerTheme {
+//        Calendar()
+//    }
+//}
+
+fun dateListToLocalDateMap(dateList: List<RoutinaryDate>): Map<LocalDate, Boolean> {
+    val localDateMap: MutableMap<LocalDate, Boolean> = mutableMapOf()
+    val formatter = DateTimeFormatter.ofPattern("yyyyMMdd")
+
+    dateList.forEach { date ->
+        localDateMap[LocalDate.parse(date.dateID, formatter)] = true
     }
+
+    return localDateMap.toMap()
 }
 
 //@Preview(showBackground = true)
