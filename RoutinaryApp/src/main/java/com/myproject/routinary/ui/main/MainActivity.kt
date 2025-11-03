@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -54,14 +55,21 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
         dateViewModel: DateViewModel = hiltViewModel()
 ) {
 //     💡 1. ViewModel의 StateFlow를 State로 변환하여 관찰
 //     userList의 값이 변경되면 이 Composable이 자동으로 재구성(Recompose)됩니다.
-     val dateList: List<RoutinaryDate> by dateViewModel.allDates.collectAsStateWithLifecycle()
+    val dateList: List<RoutinaryDate> by dateViewModel.allDates.collectAsStateWithLifecycle()
     val isDateIDAdded by dateViewModel.isDateAdded.collectAsState()
+
+    // 1. 다이얼로그(글쓰기 화면)의 표시 여부를 관리하는 상태
+    var showWritingScreen by remember { mutableStateOf(false) }
+
+    // 2. 저장된 텍스트를 표시하기 위한 상태
+    var savedText by remember { mutableStateOf("아직 저장된 내용이 없습니다.") }
 
     // 1. SnackbarHostState 생성 및 기억
     // 스낵바를 표시/숨김 상태를 제어하는 핵심 객체
@@ -93,6 +101,15 @@ fun MainScreen(
     }
 
     Scaffold(
+        topBar = {
+            Surface(
+                shadowElevation = 4.dp, // 여기에 원하는 그림자 깊이를 설정합니다.
+                // Surface의 색상을 TopAppBar의 기본 색상(surface)과 일치시킵니다.
+                color = MaterialTheme.colorScheme.surface
+            ) {
+                TopAppBar(title = { Text("메인 화면") })
+            }
+        },
         snackbarHost = {
             // SnackbarHost에 HostState를 전달하여 스낵바를 화면 하단에 띄울 준비
             SnackbarHost(hostState = snackbarHostState)
@@ -102,6 +119,7 @@ fun MainScreen(
                 // modifier: UI 요소의 크기, 여백 등을 설정합니다.
                 modifier = Modifier
                     .fillMaxSize() // 화면을 꽉 채웁니다.
+                    .padding(paddingValues)
                     .padding(16.dp),
                 // verticalArrangement: 수직 방향 정렬을 가운데로 맞춥니다.
                 verticalArrangement = Arrangement.Top,
@@ -133,9 +151,41 @@ fun MainScreen(
                 dateList.forEach { date ->
                     Text(text = "dateID: ${date.dateID}, numbering = ${date.numbering}")
                 }
+
+                Button(onClick = { showWritingScreen = true }) {
+                    Text("새 글쓰기 화면 열기")
+                }
+
+                Text(
+                    text = savedText,
+                    style = MaterialTheme.typography.bodyLarge
+                )
             }
         }
     )
+
+    if (showWritingScreen) {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+        // ModalBottomSheet는 기본적으로 화면 하단에 붙고 좌우를 가득 채웁니다.
+        ModalBottomSheet(
+            onDismissRequest = { showWritingScreen = false },
+            sheetState = sheetState,
+            // ModalBottomSheet의 높이를 화면의 50%로 설정
+            modifier = Modifier.fillMaxHeight(0.5f)
+        ) {
+            // 시트의 내용물 컴포저블을 호출합니다.
+            WritingSheetContent(
+                // 취소 버튼이나 외부 클릭 시 시트 닫기
+                onDismiss = { showWritingScreen = false },
+                // '저장' 버튼을 눌렀을 때 호출될 함수 (저장된 텍스트를 업데이트)
+                onSave = { newText ->
+                    savedText = newText
+                    showWritingScreen = false // 저장 후 시트 닫기
+                }
+            )
+        }
+    }
 }
 
 @Composable
@@ -215,6 +265,72 @@ fun Calendar() {
                 state = state,
                 dayContent = { Day(it) }
             )
+        }
+    }
+}
+
+@Composable
+fun WritingSheetContent(
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit
+) {
+    // 텍스트 필드에 입력된 값을 관리하는 상태
+    var textState by remember { mutableStateOf("") }
+
+    // ModalBottomSheet의 콘텐츠 영역입니다.
+    Column(
+        // ✨ fillMaxHeight() 제거: 이제 Column은 콘텐츠의 높이만큼만 차지합니다.
+        modifier = Modifier
+            .wrapContentHeight() // 콘텐츠 높이에 맞게 감싸기
+            .fillMaxWidth() // 너비는 가득 채우기
+            .padding(horizontal = 20.dp) // 좌우 내부 여백 설정
+            .padding(top = 16.dp, bottom = 20.dp), // 상하 내부 여백 설정
+
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // ✨ Spacer(weight(1f)) 제거: 더 이상 콘텐츠를 밀어낼 필요가 없습니다.
+
+        Text(
+            text = "새로운 글 작성",
+            style = MaterialTheme.typography.headlineSmall,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+
+        // 텍스트 입력 공간
+        OutlinedTextField(
+            value = textState,
+            onValueChange = { textState = it },
+            label = { Text("내용을 입력하세요") },
+            // 고정 높이를 유지합니다.
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(200.dp)
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
+        ) {
+            // 취소 버튼
+            TextButton(onClick = onDismiss) {
+                Text("취소")
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // 저장 버튼 (텍스트 가져오기 및 저장)
+            Button(
+                onClick = {
+                    // 입력된 텍스트(textState)를 가져와서 onSave 콜백 함수로 전달
+                    onSave(textState)
+                },
+                // 입력된 내용이 있을 때만 버튼 활성화
+                enabled = textState.isNotBlank()
+            ) {
+                Text("저장")
+            }
         }
     }
 }
