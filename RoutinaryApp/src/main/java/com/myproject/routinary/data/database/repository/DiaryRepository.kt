@@ -19,13 +19,22 @@ class DiaryRepository @Inject constructor(private val diaryDao: DiaryDao) {
     // DAO의 삽입 함수를 호출합니다.
     suspend fun insert(diary: Diary) : Boolean {
         delay(10L)
-        if (null != diaryDao.getDateIDById(diary.dateID)) {
-            val newEntry = diary.copy()
-            diaryDao.insertDiary(newEntry)
-            return true
+        if (null != diaryDao.getParentDateIDById(diary.dateID)) {
+            if (diaryDao.hasDateID(diary.dateID)) {
+                update(diary)
+                return false
+            } else {
+                val newEntry = diary.copy()
+                diaryDao.insertDiary(newEntry)
+                return true
+            }
         } else {
             return false
         }
+    }
+
+    suspend fun update(diary: Diary) {
+        diaryDao.update(diary.dateID, diary.diaryTitle, diary.diaryContent)
     }
 
     suspend fun deleteAll() {

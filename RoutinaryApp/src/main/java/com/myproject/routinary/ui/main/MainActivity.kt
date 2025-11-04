@@ -18,12 +18,18 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.myproject.routinary.ui.theme.RoutinerTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -73,12 +79,10 @@ fun MainScreen(
     val isDateIDAdded by dateViewModel.isDateAdded.collectAsState()
 
     val localDateMap: Map<LocalDate, Boolean> = dateListToLocalDateMap(dateList)
+    val diaryMap: Map<String, Diary> = diaryList.associateBy { it.dateID }
 
     // 1. 다이얼로그(글쓰기 화면)의 표시 여부를 관리하는 상태
     var showWritingScreen by remember { mutableStateOf(false) }
-
-    // 2. 저장된 텍스트를 표시하기 위한 상태
-    var savedText by remember { mutableStateOf("아직 저장된 내용이 없습니다.") }
 
     // 1. SnackbarHostState 생성 및 기억
     // 스낵바를 표시/숨김 상태를 제어하는 핵심 객체
@@ -137,7 +141,7 @@ fun MainScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
 
-                Calendar(localDateMap)
+                Calendar(localDateMap, diaryMap)
 
                 Row (
                     horizontalArrangement = Arrangement.SpaceAround,
@@ -163,13 +167,8 @@ fun MainScreen(
                 }
 
                 Button(onClick = { showWritingScreen = true }) {
-                    Text("새 글쓰기 화면 열기")
+                    Text("오늘의 일기쓰기")
                 }
-
-                Text(
-                    text = savedText,
-                    style = MaterialTheme.typography.bodyLarge
-                )
             }
         }
     )
@@ -182,17 +181,18 @@ fun MainScreen(
             onDismissRequest = { showWritingScreen = false },
             sheetState = sheetState,
             // ModalBottomSheet의 높이를 화면의 50%로 설정
-            modifier = Modifier.fillMaxHeight(0.5f)
+            // modifier = Modifier.fillMaxHeight(0.5f)
         ) {
             // 시트의 내용물 컴포저블을 호출합니다.
             WritingSheetContent(
+                diaryMap,
+                dateViewModel,
                 // 취소 버튼이나 외부 클릭 시 시트 닫기
                 onDismiss = { showWritingScreen = false },
                 // '저장' 버튼을 눌렀을 때 호출될 함수 (저장된 텍스트를 업데이트)
-                onSave = { newText ->
-                    savedText = newText
+                onSave = { newText, newTtile ->
                     dateViewModel.addNewDate(dateViewModel.createDateID())
-                    diaryViewModel.addNewDiary(dateViewModel.createDateID(), "test title", newText)
+                    diaryViewModel.addNewDiary(dateViewModel.createDateID(), newTtile, newText)
                     showWritingScreen = false // 저장 후 시트 닫기
                 }
             )
@@ -206,7 +206,7 @@ fun Day(day: CalendarDay, isSelected: Boolean, hasDate: Boolean, onClick: (Calen
         modifier = Modifier
             .aspectRatio(1f)
             .clip(CircleShape)
-            .background(color = if (isSelected || hasDate) Color.Green else Color.Transparent)
+            .background(color = if (hasDate) Color.Green else Color.Transparent)
             .clickable(
                 enabled = day.position == DayPosition.MonthDate,
                 onClick = { onClick(day) }
@@ -230,12 +230,14 @@ fun DaysOfWeekTitle(daysOfWeek: List<DayOfWeek>) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun Calendar(localDateMap : Map<LocalDate, Boolean>) {
+fun Calendar(localDateMap : Map<LocalDate, Boolean>, diaryMap: Map<String, Diary>) {
     val currentMonth = remember { YearMonth.now() }
     val startMonth = remember { currentMonth.minusMonths(100) } // Adjust as needed
     val endMonth = remember { currentMonth.plusMonths(100) } // Adjust as needed
     val daysOfWeek = remember { daysOfWeek() } // Available from the library
+    var showDiaryListScreen by remember { mutableStateOf(false) }
 
     val state = rememberCalendarState(
         startMonth = startMonth,
@@ -270,21 +272,41 @@ fun Calendar(localDateMap : Map<LocalDate, Boolean>) {
                 state = state,
                 dayContent = { day ->
                     Day(day, isSelected = selectedDate == day.date, hasDate = localDateMap[day.date]?:false) { day ->
-                        selectedDate = if (selectedDate == day.date) null else day.date
+                        selectedDate = day.date
+                        showDiaryListScreen = true;
                     }
                 }
             )
+        }
+    }
+
+    if (showDiaryListScreen) {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val dtf = DateTimeFormatter.ofPattern("yyyyMMdd")
+        // ModalBottomSheet는 기본적으로 화면 하단에 붙고 좌우를 가득 채웁니다.
+        ModalBottomSheet(
+            onDismissRequest = { showDiaryListScreen = false },
+            sheetState = sheetState,
+            // ModalBottomSheet의 높이를 화면의 50%로 설정
+            // modifier = Modifier.fillMaxHeight(0.5f)
+        ) {
+
+            // 시트의 내용물 컴포저블을 호출합니다.
+            DiaryView(diaryMap, selectedDate?.format(dtf)?:"")
         }
     }
 }
 
 @Composable
 fun WritingSheetContent(
+    diaryMap: Map<String, Diary>,
+    dateViewModel: DateViewModel,
     onDismiss: () -> Unit,
-    onSave: (String) -> Unit
+    onSave: (String, String) -> Unit
 ) {
     // 텍스트 필드에 입력된 값을 관리하는 상태
-    var textState by remember { mutableStateOf("") }
+    var textState by remember { mutableStateOf(diaryMap[dateViewModel.createDateID()]?.diaryContent ?: "") }
+    var titleTextState by remember { mutableStateOf(diaryMap[dateViewModel.createDateID()]?.diaryTitle ?: "") }
 
     // ModalBottomSheet의 콘텐츠 영역입니다.
     Column(
@@ -297,12 +319,21 @@ fun WritingSheetContent(
 
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // ✨ Spacer(weight(1f)) 제거: 더 이상 콘텐츠를 밀어낼 필요가 없습니다.
 
         Text(
-            text = "새로운 글 작성",
+            text = "일기 작성",
             style = MaterialTheme.typography.headlineSmall,
             modifier = Modifier.padding(bottom = 16.dp)
+        )
+
+        OutlinedTextField(
+            value = titleTextState,
+            onValueChange = { titleTextState = it },
+            label = { Text("제목") },
+            // 고정 높이를 유지합니다.
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(100.dp)
         )
 
         // 텍스트 입력 공간
@@ -313,7 +344,7 @@ fun WritingSheetContent(
             // 고정 높이를 유지합니다.
             modifier = Modifier
                 .fillMaxWidth()
-                .height(200.dp)
+                .height(400.dp)
         )
 
         Spacer(modifier = Modifier.height(20.dp))
@@ -333,10 +364,10 @@ fun WritingSheetContent(
             Button(
                 onClick = {
                     // 입력된 텍스트(textState)를 가져와서 onSave 콜백 함수로 전달
-                    onSave(textState)
+                    onSave(textState, titleTextState)
                 },
                 // 입력된 내용이 있을 때만 버튼 활성화
-                enabled = textState.isNotBlank()
+                enabled = textState.isNotBlank() and titleTextState.isNotBlank()
             ) {
                 Text("저장")
             }
@@ -344,6 +375,34 @@ fun WritingSheetContent(
     }
 }
 
+@Composable
+fun DiaryView(diaryMap: Map<String, Diary>, dateID: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+            .height(400.dp)
+    ) {
+        // 1. 제목 (Title)
+        Text(
+            text = diaryMap[dateID]?.diaryTitle?: "아직 일기가 없습니다.",
+            style = MaterialTheme.typography.headlineMedium, // 더 크고 굵은 제목 스타일
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 12.dp) // 내용과의 간격
+        )
+
+        // 2. 구분선 (Optional: 제목과 내용을 시각적으로 분리)
+        HorizontalDivider(thickness = 1.dp, color = Color.LightGray)
+
+        // 3. 내용 (Content)
+        Text(
+            text = diaryMap[dateID]?.diaryContent?: "",
+            style = MaterialTheme.typography.bodyLarge, // 일반적인 본문 스타일
+            modifier = Modifier.padding(top = 12.dp)
+                .verticalScroll(rememberScrollState())
+        )
+    }
+}
 //@Preview(showBackground = true)
 //@Composable
 //fun CalendarPreview() {

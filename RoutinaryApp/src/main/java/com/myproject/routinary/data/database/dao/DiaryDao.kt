@@ -6,6 +6,7 @@ import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Relation
 import androidx.room.Transaction
+import androidx.room.Update
 import com.myproject.routinary.data.database.entity.Diary
 import kotlinx.coroutines.flow.Flow
 
@@ -34,7 +35,13 @@ interface DiaryDao {
     suspend fun deleteAll()
 
     @Query("SELECT dateID FROM RoutinaryDate WHERE dateID = :id LIMIT 1")
-    suspend fun getDateIDById(id: String): String?
+    suspend fun getParentDateIDById(id: String): String?
+
+    @Query("SELECT EXISTS(SELECT 1 FROM Diary WHERE dateID = :id)")
+    suspend fun hasDateID(id: String): Boolean
+
+    @Query("UPDATE Diary SET diaryTitle = :newTitle, diaryContent = :newContent WHERE dateID = :id")
+    suspend fun update(id: String, newTitle: String, newContent: String): Int
 
     // @Update, @Delete 등 다른 어노테이션도 사용 가능
 }
