@@ -11,6 +11,7 @@ import android.content.Context
 import androidx.room.Room
 import com.myproject.routinary.data.database.RoutinaryDB
 import com.myproject.routinary.data.database.dao.DateDao
+import com.myproject.routinary.data.database.dao.DiaryDao
 import dagger.hilt.android.qualifiers.ApplicationContext
 
 @Module
@@ -35,5 +36,10 @@ object AppModule {
     @Provides
     fun provideDateDao(database: RoutinaryDB): DateDao {
         return database.dateDao()
+    }
+
+    @Provides
+    fun provideDiaryDao(database: RoutinaryDB): DiaryDao {
+        return database.diaryDao()
     }
 }

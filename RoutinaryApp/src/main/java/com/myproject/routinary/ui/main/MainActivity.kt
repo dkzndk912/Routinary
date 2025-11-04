@@ -33,6 +33,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kizitonwose.calendar.core.*
 import com.kizitonwose.calendar.compose.*
+import com.myproject.routinary.data.database.entity.Diary
 import com.myproject.routinary.data.database.entity.RoutinaryDate
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -62,11 +63,13 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
-        dateViewModel: DateViewModel = hiltViewModel()
+        dateViewModel: DateViewModel = hiltViewModel(),
+        diaryViewModel: DiaryViewModel = hiltViewModel()
 ) {
 //     💡 1. ViewModel의 StateFlow를 State로 변환하여 관찰
 //     userList의 값이 변경되면 이 Composable이 자동으로 재구성(Recompose)됩니다.
     val dateList: List<RoutinaryDate> by dateViewModel.allDates.collectAsStateWithLifecycle()
+    val diaryList: List<Diary> by diaryViewModel.allDiaries.collectAsStateWithLifecycle()
     val isDateIDAdded by dateViewModel.isDateAdded.collectAsState()
 
     val localDateMap: Map<LocalDate, Boolean> = dateListToLocalDateMap(dateList)
@@ -97,7 +100,8 @@ fun MainScreen(
             scope.launch {
                 snackbarHostState.showSnackbar(
                     message = message,
-                    actionLabel = "확인"
+                    actionLabel = "확인",
+                    duration = SnackbarDuration.Short
                 )
                 // 필요하다면 다시 null로 초기화하여 다음 상호작용을 준비
                 // viewModel._isDateAdded.value = null (ViewModel 내부에서 처리 권장
@@ -187,6 +191,8 @@ fun MainScreen(
                 // '저장' 버튼을 눌렀을 때 호출될 함수 (저장된 텍스트를 업데이트)
                 onSave = { newText ->
                     savedText = newText
+                    dateViewModel.addNewDate(dateViewModel.createDateID())
+                    diaryViewModel.addNewDiary(dateViewModel.createDateID(), "test title", newText)
                     showWritingScreen = false // 저장 후 시트 닫기
                 }
             )
