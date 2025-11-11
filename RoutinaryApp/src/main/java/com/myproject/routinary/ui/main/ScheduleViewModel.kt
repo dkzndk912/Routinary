@@ -4,8 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.myproject.routinary.data.database.entity.Diary
 import com.myproject.routinary.data.database.entity.RoutinaryDate
+import com.myproject.routinary.data.database.entity.Schedule
 import com.myproject.routinary.data.database.repository.DateRepository
 import com.myproject.routinary.data.database.repository.DiaryRepository
+import com.myproject.routinary.data.database.repository.ScheduleRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,11 +24,11 @@ import java.util.Date
 import javax.inject.Inject
 
 @HiltViewModel
-class DiaryViewModel @Inject constructor (private val repository: DiaryRepository) : ViewModel() {
+class ScheduleViewModel @Inject constructor (private val repository: ScheduleRepository) : ViewModel() {
 
     // 💡 1. Flow를 Compose State로 변환 (StateFlow나 LiveData 사용 가능)
     // 이 상태를 Compose에서 관찰(collectAsState)하여 UI에 반영합니다.
-    val allDiaries: StateFlow<List<Diary>> = repository.allDiaries
+    val allDiaries: StateFlow<List<Schedule>> = repository.allSchedules
         .stateIn(
             scope = viewModelScope, // ViewModel의 생명 주기에 맞게 동작하도록 설정
             started = SharingStarted.WhileSubscribed(5000), // 구독자가 있을 때 활성화
@@ -34,12 +36,12 @@ class DiaryViewModel @Inject constructor (private val repository: DiaryRepositor
         )
 
     // 💡 2. 사용자 이벤트를 처리하는 함수
-    fun addNewDiary(dateID : String, title : String, content : String) {
+    fun addNewSchedule(dateID : String, title : String, content : String) {
         // 비동기 작업을 위해 viewModelScope 코루틴을 사용
         viewModelScope.launch {
-                val newDiary = Diary(dateID = dateID, diaryTitle = title, diaryContent = content)
+                val newSchedule = Schedule(dateID = dateID, scheduleTtile = title, scheduleContent = content)
                 // Repository의 insert 함수는 suspend 함수여야 합니다.
-                repository.insert(newDiary)
+                repository.insert(newSchedule)
         }
     }
 
