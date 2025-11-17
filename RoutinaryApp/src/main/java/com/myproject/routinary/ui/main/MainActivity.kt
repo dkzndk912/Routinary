@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -22,13 +23,18 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import androidx.compose.material3.DatePickerDefaults.dateFormatter
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -39,9 +45,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kizitonwose.calendar.core.*
 import com.kizitonwose.calendar.compose.*
+import com.kizitonwose.calendar.compose.weekcalendar.rememberWeekCalendarState
 import com.myproject.routinary.data.database.entity.Diary
 import com.myproject.routinary.data.database.entity.RoutinaryDate
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -143,28 +152,28 @@ fun MainScreen(
 
                 Calendar(localDateMap, diaryMap)
 
-                Row (
-                    horizontalArrangement = Arrangement.SpaceAround,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                ) {
-//            Button(onClick = { dateViewModel.addNewDate(dateViewModel.createDateID()) })
-//            { Text("DateID 추가") }
-                    Button(onClick = { dateViewModel.addNewDate(dateViewModel.createDateID()) })
-                    {
-                        Text("dateID 추가")
-                    }
-                    Button(onClick = { dateViewModel.deleteAll() })
-                    {
-                        Text("모두 삭제")
-                    }
-                }
-
-                Text(text = "Date 목록", style = MaterialTheme.typography.headlineLarge)
-                dateList.forEach { date ->
-                    Text(text = "dateID: ${date.dateID}, numbering = ${date.numbering}")
-                }
+//                Row (
+//                    horizontalArrangement = Arrangement.SpaceAround,
+//                    modifier = Modifier
+//                        .fillMaxWidth()
+//                        .padding(16.dp)
+//                ) {
+////            Button(onClick = { dateViewModel.addNewDate(dateViewModel.createDateID()) })
+////            { Text("DateID 추가") }
+//                    Button(onClick = { dateViewModel.addNewDate(dateViewModel.createDateID()) })
+//                    {
+//                        Text("dateID 추가")
+//                    }
+//                    Button(onClick = { dateViewModel.deleteAll() })
+//                    {
+//                        Text("모두 삭제")
+//                    }
+//                }
+//
+//                Text(text = "Date 목록", style = MaterialTheme.typography.headlineLarge)
+//                dateList.forEach { date ->
+//                    Text(text = "dateID: ${date.dateID}, numbering = ${date.numbering}")
+//                }
 
                 Button(onClick = { showWritingScreen = true }) {
                     Text("오늘의 일기쓰기")
@@ -207,16 +216,64 @@ fun Day(day: CalendarDay, isSelected: Boolean, hasDate: Boolean, onClick: (Calen
             .aspectRatio(1f)
             .clip(CircleShape)
             .background(color = if (hasDate) Color.Green else Color.Transparent)
+            .border(
+                shape = CircleShape,
+                width = if (isSelected) 2.dp else 0.dp,
+                color = if (isSelected) Color.Magenta else Color.Transparent)
             .clickable(
                 enabled = day.position == DayPosition.MonthDate,
                 onClick = { onClick(day) }
             ),
         contentAlignment = Alignment.Center
     ) {
-        Text(text = day.date.dayOfMonth.toString())
+        Text(text = day.date.dayOfMonth.toString(),
+            color = if (day.position == DayPosition.MonthDate) Color.Black else Color.Gray)
+
     }
 }
 
+@Composable
+fun weekDay(day: WeekDay, isSelected: Boolean, onClick: (WeekDay) -> Unit) {
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+
+    Box(
+        modifier = Modifier
+            .width(screenWidth / 8)
+            .padding(2.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .border(
+            shape = RoundedCornerShape(8.dp),
+            width = if (isSelected) 2.dp else 0.dp,
+            color = if (isSelected) Color.Magenta else Color.Transparent)
+            .clickable { onClick(day) }
+            .wrapContentHeight()
+        ,
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier.padding(vertical = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+//            Text(
+//                text = day.date.month.getDisplayName(TextStyle.SHORT, Locale.getDefault()),
+//                fontSize = 10.sp,
+//                fontWeight = FontWeight.Normal,
+//            )
+            Text(
+                text = day.date.dayOfMonth.toString(),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = day.date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Normal,
+            )
+        }
+    }
+}
 @Composable
 fun DaysOfWeekTitle(daysOfWeek: List<DayOfWeek>) {
     Row(modifier = Modifier.fillMaxWidth()) {
@@ -237,7 +294,12 @@ fun Calendar(localDateMap : Map<LocalDate, Boolean>, diaryMap: Map<String, Diary
     val startMonth = remember { currentMonth.minusMonths(100) } // Adjust as needed
     val endMonth = remember { currentMonth.plusMonths(100) } // Adjust as needed
     val daysOfWeek = remember { daysOfWeek() } // Available from the library
+    val firstDayOfWeek = remember { firstDayOfWeekFromLocale() }
+    val currentDate = remember { LocalDate.now() }
+    val startDate = remember { currentMonth.minusMonths(100).atStartOfMonth() } // Adjust as needed
+    val endDate = remember { currentMonth.plusMonths(100).atEndOfMonth() } // Adjust as needed
     var showDiaryListScreen by remember { mutableStateOf(false) }
+    val dtf = DateTimeFormatter.ofPattern("yyyyMMdd")
 
     val state = rememberCalendarState(
         startMonth = startMonth,
@@ -247,25 +309,34 @@ fun Calendar(localDateMap : Map<LocalDate, Boolean>, diaryMap: Map<String, Diary
         firstDayOfWeek = daysOfWeek.first()
     )
 
-    var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
+    val weekState = rememberWeekCalendarState(
+        startDate = startDate,
+        endDate = endDate,
+        firstVisibleWeekDate = currentDate,
+        firstDayOfWeek = firstDayOfWeek,
+    )
+
+    val visibleMonth = rememberFirstMostVisibleMonth(state, viewportPercent = 90f)
+    val coroutineScope = rememberCoroutineScope()
+    var selectedDate by remember { mutableStateOf<LocalDate?>(LocalDate.now()) }
 
     Column(
         // modifier: UI 요소의 크기, 여백 등을 설정합니다.
         modifier = Modifier
-            .padding(16.dp),
+            .padding(12.dp),
         // verticalArrangement: 수직 방향 정렬을 가운데로 맞춥니다.
         verticalArrangement = Arrangement.Top,
         // horizontalAlignment: 수평 방향 정렬을 가운데로 맞춥니다.
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // 3. Text: 화면에 숫자를 표시하는 위젯입니다.
-        Text(text = "캘린더", style = MaterialTheme.typography.headlineLarge)
-        Text(text = currentMonth.toString(), style = MaterialTheme.typography.headlineLarge)
+        Text(text = visibleMonth.yearMonth.toString(), fontSize = 22.sp)
 
-        Spacer(modifier = Modifier.height(18.dp)) // 사이에 공간을 둡니다.
+        Spacer(modifier = Modifier.height(12.dp)) // 사이에 공간을 둡니다.
         DaysOfWeekTitle(daysOfWeek = daysOfWeek)
         Box(
             modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
                 .background(Color.LightGray)
         ) {
             HorizontalCalendar(
@@ -273,16 +344,73 @@ fun Calendar(localDateMap : Map<LocalDate, Boolean>, diaryMap: Map<String, Diary
                 dayContent = { day ->
                     Day(day, isSelected = selectedDate == day.date, hasDate = localDateMap[day.date]?:false) { day ->
                         selectedDate = day.date
-                        showDiaryListScreen = true;
+                        coroutineScope.launch {
+                            weekState.animateScrollToDay(WeekDay(day.date.minusDays(3), WeekDayPosition.RangeDate))
+                        }
                     }
                 }
             )
         }
+        WeekCalendar(
+            state = weekState,
+            dayContent = { day ->
+                weekDay (day, isSelected = selectedDate == day.date) { day ->
+                    selectedDate = day.date
+                    coroutineScope.launch {
+                        weekState.animateScrollToDay(WeekDay(day.date.minusDays(3), WeekDayPosition.RangeDate))
+                    }
+                    coroutineScope.launch {
+                        state.animateScrollToMonth(day.date.yearMonth)
+                    }
+                } },
+            calendarScrollPaged = false,
+            userScrollEnabled = false
+        )
+
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth().fillMaxHeight(0.8f),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            item {
+                HorizontalDivider(Modifier.fillMaxWidth(0.9f), DividerDefaults.Thickness, DividerDefaults.color)
+                Row {
+                    Box(Modifier.fillMaxWidth(0.25f)
+                        .height(80.dp)
+                        .clickable(onClick = {}),
+                        contentAlignment = Alignment.Center) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize(0.5f)
+                                .aspectRatio(1f)
+                                .clip(CircleShape)
+                                .background(color = Color.Green)
+                                .border(
+                                    shape = CircleShape,
+                                    width = 2.dp,
+                                    color = Color.LightGray),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(text = "일기")
+                        }
+                    }
+                    Box(Modifier.fillMaxWidth()
+                        .height(80.dp)
+                        .clickable(onClick = {showDiaryListScreen = true}),
+                        contentAlignment = Alignment.Center) {
+                        Text(text = diaryMap[selectedDate?.format(dtf)?:""]?.diaryTitle?:"아직 일기가 없습니다.",)
+                    }
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(true) {
+            weekState.animateScrollToDay(WeekDay(currentDate.minusDays(3), WeekDayPosition.RangeDate))
     }
 
     if (showDiaryListScreen) {
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        val dtf = DateTimeFormatter.ofPattern("yyyyMMdd")
+
         // ModalBottomSheet는 기본적으로 화면 하단에 붙고 좌우를 가득 채웁니다.
         ModalBottomSheet(
             onDismissRequest = { showDiaryListScreen = false },
@@ -290,7 +418,6 @@ fun Calendar(localDateMap : Map<LocalDate, Boolean>, diaryMap: Map<String, Diary
             // ModalBottomSheet의 높이를 화면의 50%로 설정
             // modifier = Modifier.fillMaxHeight(0.5f)
         ) {
-
             // 시트의 내용물 컴포저블을 호출합니다.
             DiaryView(diaryMap, selectedDate?.format(dtf)?:"")
         }
@@ -403,14 +530,6 @@ fun DiaryView(diaryMap: Map<String, Diary>, dateID: String) {
         )
     }
 }
-//@Preview(showBackground = true)
-//@Composable
-//fun CalendarPreview() {
-//    RoutinerTheme {
-//        Calendar()
-//    }
-//}
-
 fun dateListToLocalDateMap(dateList: List<RoutinaryDate>): Map<LocalDate, Boolean> {
     val localDateMap: MutableMap<LocalDate, Boolean> = mutableMapOf()
     val formatter = DateTimeFormatter.ofPattern("yyyyMMdd")
@@ -422,6 +541,34 @@ fun dateListToLocalDateMap(dateList: List<RoutinaryDate>): Map<LocalDate, Boolea
     return localDateMap.toMap()
 }
 
+@Composable
+fun rememberFirstMostVisibleMonth(
+    state: CalendarState,
+    viewportPercent: Float = 50f,
+): CalendarMonth {
+    val visibleMonth = remember(state) { mutableStateOf(state.firstVisibleMonth) }
+    LaunchedEffect(state) {
+        snapshotFlow { state.layoutInfo.firstMostVisibleMonth(viewportPercent) }
+            .filterNotNull()
+            .collect { month -> visibleMonth.value = month }
+    }
+    return visibleMonth.value
+}
+
+private fun CalendarLayoutInfo.firstMostVisibleMonth(viewportPercent: Float = 50f): CalendarMonth? {
+    return if (visibleMonthsInfo.isEmpty()) {
+        null
+    } else {
+        val viewportSize = (viewportEndOffset + viewportStartOffset) * viewportPercent / 100f
+        visibleMonthsInfo.firstOrNull { itemInfo ->
+            if (itemInfo.offset < 0) {
+                itemInfo.offset + itemInfo.size >= viewportSize
+            } else {
+                itemInfo.size - itemInfo.offset >= viewportSize
+            }
+        }?.month
+    }
+}
 //@Preview(showBackground = true)
 //@Composable
 //fun MainScreenPreview() {
