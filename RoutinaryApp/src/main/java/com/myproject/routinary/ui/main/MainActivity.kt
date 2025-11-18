@@ -29,6 +29,7 @@ import androidx.compose.material3.*
 import androidx.compose.material3.DatePickerDefaults.dateFormatter
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -43,6 +44,10 @@ import androidx.compose.ui.window.Dialog
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.kizitonwose.calendar.core.*
 import com.kizitonwose.calendar.compose.*
 import com.kizitonwose.calendar.compose.weekcalendar.rememberWeekCalendarState
@@ -65,12 +70,37 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            // MyFirstAppTheme 안에 카운터 앱을 만듭니다.
             // git push and pull test from N to P
             // git push and pull test from P to N
             RoutinerTheme {
-                MainScreen()
+                AppNavigation()
             }
+        }
+    }
+}
+
+object Screen {
+    const val MAIN = "main_screen"
+    const val SCHEDULE = "scheduleWrite_screen"
+}
+
+@Composable
+fun AppNavigation() {
+    // NavController 생성 및 기억
+    val navController = rememberNavController()
+
+    // 화면(Destination)들을 호스팅하는 영역 정의
+    NavHost(
+        navController = navController,
+        startDestination = Screen.MAIN // 앱 시작 시 첫 화면
+    ) {
+        // 1. 홈 화면 (Screen.HOME) 정의
+        composable(Screen.MAIN) {
+            MainScreen(navController = navController)
+        }
+
+        composable(Screen.SCHEDULE) {
+            ScheduleWriteScreen(navController = navController)
         }
     }
 }
@@ -78,6 +108,7 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
+        navController: NavController,
         dateViewModel: DateViewModel = hiltViewModel(),
         diaryViewModel: DiaryViewModel = hiltViewModel()
 ) {
@@ -152,31 +183,13 @@ fun MainScreen(
 
                 Calendar(localDateMap, diaryMap)
 
-//                Row (
-//                    horizontalArrangement = Arrangement.SpaceAround,
-//                    modifier = Modifier
-//                        .fillMaxWidth()
-//                        .padding(16.dp)
-//                ) {
-////            Button(onClick = { dateViewModel.addNewDate(dateViewModel.createDateID()) })
-////            { Text("DateID 추가") }
-//                    Button(onClick = { dateViewModel.addNewDate(dateViewModel.createDateID()) })
-//                    {
-//                        Text("dateID 추가")
-//                    }
-//                    Button(onClick = { dateViewModel.deleteAll() })
-//                    {
-//                        Text("모두 삭제")
-//                    }
-//                }
-//
-//                Text(text = "Date 목록", style = MaterialTheme.typography.headlineLarge)
-//                dateList.forEach { date ->
-//                    Text(text = "dateID: ${date.dateID}, numbering = ${date.numbering}")
-//                }
-
-                Button(onClick = { showWritingScreen = true }) {
-                    Text("오늘의 일기쓰기")
+                Row {
+                    Button(onClick = { showWritingScreen = true }) {
+                        Text("오늘의 일기쓰기")
+                    }
+                    Button(onClick = { navController.navigate(Screen.SCHEDULE) }) {
+                        Text("현재 날짜에 일정 추가")
+                    }
                 }
             }
         }
@@ -207,6 +220,46 @@ fun MainScreen(
             )
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ScheduleWriteScreen(
+    navController: NavController,
+    dateViewModel: DateViewModel = hiltViewModel(),
+) {
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    Scaffold(
+        topBar = {
+            Surface(
+                shadowElevation = 4.dp, // 여기에 원하는 그림자 깊이를 설정합니다.
+                // Surface의 색상을 TopAppBar의 기본 색상(surface)과 일치시킵니다.
+                color = MaterialTheme.colorScheme.surface
+            ) {
+                TopAppBar(title = { Text("일정 작성") })
+            }
+        },
+        snackbarHost = {
+            // SnackbarHost에 HostState를 전달하여 스낵바를 화면 하단에 띄울 준비
+            SnackbarHost(hostState = snackbarHostState)
+        },
+        content = { paddingValues ->
+            Column(
+                // modifier: UI 요소의 크기, 여백 등을 설정합니다.
+                modifier = Modifier
+                    .fillMaxSize() // 화면을 꽉 채웁니다.
+                    .padding(paddingValues)
+                    .padding(16.dp),
+                // verticalArrangement: 수직 방향 정렬을 가운데로 맞춥니다.
+                verticalArrangement = Arrangement.Top,
+                // horizontalAlignment: 수평 방향 정렬을 가운데로 맞춥니다.
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+
+            }
+        }
+    )
 }
 
 @Composable
@@ -318,7 +371,7 @@ fun Calendar(localDateMap : Map<LocalDate, Boolean>, diaryMap: Map<String, Diary
 
     val visibleMonth = rememberFirstMostVisibleMonth(state, viewportPercent = 90f)
     val coroutineScope = rememberCoroutineScope()
-    var selectedDate by remember { mutableStateOf<LocalDate?>(LocalDate.now()) }
+    var selectedDate by rememberSaveable { mutableStateOf<LocalDate?>(LocalDate.now()) }
 
     Column(
         // modifier: UI 요소의 크기, 여백 등을 설정합니다.
@@ -405,7 +458,7 @@ fun Calendar(localDateMap : Map<LocalDate, Boolean>, diaryMap: Map<String, Diary
     }
 
     LaunchedEffect(true) {
-            weekState.animateScrollToDay(WeekDay(currentDate.minusDays(3), WeekDayPosition.RangeDate))
+            weekState.animateScrollToDay(WeekDay(selectedDate!!.minusDays(3), WeekDayPosition.RangeDate))
     }
 
     if (showDiaryListScreen) {

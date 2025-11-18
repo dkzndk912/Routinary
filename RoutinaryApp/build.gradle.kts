@@ -70,6 +70,7 @@ dependencies {
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.javapoet)
     implementation(libs.hilt.android.gradle.plugin)
+    implementation(libs.androidx.navigation.compose)
     ksp(libs.room.compiler)
     ksp(libs.hilt.compiler)
     implementation(libs.room.ktx)
