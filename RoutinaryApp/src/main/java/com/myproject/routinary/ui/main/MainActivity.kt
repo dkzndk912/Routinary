@@ -1,5 +1,6 @@
 package com.myproject.routinary.ui.main
 
+import android.app.TimePickerDialog
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -35,6 +36,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -45,9 +47,11 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.kizitonwose.calendar.core.*
 import com.kizitonwose.calendar.compose.*
 import com.kizitonwose.calendar.compose.weekcalendar.rememberWeekCalendarState
@@ -59,6 +63,7 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
@@ -81,26 +86,36 @@ class MainActivity : ComponentActivity() {
 
 object Screen {
     const val MAIN = "main_screen"
-    const val SCHEDULE = "scheduleWrite_screen"
+    const val SCHEDULE = "scheduleWrite_screen/{scheduleID}"
 }
 
 @Composable
 fun AppNavigation() {
     // NavController 생성 및 기억
     val navController = rememberNavController()
+    val dateViewModel: DateViewModel = hiltViewModel()
+    val diaryViewModel: DiaryViewModel = hiltViewModel()
+    val scheduleViewModel: ScheduleViewModel = hiltViewModel()
 
     // 화면(Destination)들을 호스팅하는 영역 정의
     NavHost(
         navController = navController,
         startDestination = Screen.MAIN // 앱 시작 시 첫 화면
     ) {
-        // 1. 홈 화면 (Screen.HOME) 정의
         composable(Screen.MAIN) {
-            MainScreen(navController = navController)
+            MainScreen(navController = navController, dateViewModel, diaryViewModel, scheduleViewModel)
         }
 
-        composable(Screen.SCHEDULE) {
-            ScheduleWriteScreen(navController = navController)
+        composable(Screen.SCHEDULE,
+            arguments = listOf(
+                navArgument("scheduleID") {
+                    type = NavType.IntType
+                    defaultValue = -1
+                }
+            )
+        ) { backStackEntry ->
+            val scheduleID : Int? = backStackEntry.arguments?.getInt("scheduleID")?:-1
+            ScheduleWriteScreen(navController = navController,dateViewModel=dateViewModel , scheduleViewModel=scheduleViewModel, scheduleID = scheduleID)
         }
     }
 }
@@ -109,21 +124,23 @@ fun AppNavigation() {
 @Composable
 fun MainScreen(
         navController: NavController,
-        dateViewModel: DateViewModel = hiltViewModel(),
-        diaryViewModel: DiaryViewModel = hiltViewModel()
+        dateViewModel: DateViewModel,
+        diaryViewModel: DiaryViewModel,
+        scheduleViewModel: ScheduleViewModel,
 ) {
 //     💡 1. ViewModel의 StateFlow를 State로 변환하여 관찰
 //     userList의 값이 변경되면 이 Composable이 자동으로 재구성(Recompose)됩니다.
     val dateList: List<RoutinaryDate> by dateViewModel.allDates.collectAsStateWithLifecycle()
     val diaryList: List<Diary> by diaryViewModel.allDiaries.collectAsStateWithLifecycle()
     val isDateIDAdded by dateViewModel.isDateAdded.collectAsState()
+    val selectedDate by dateViewModel.selectedDate.collectAsStateWithLifecycle()
 
     val localDateMap: Map<LocalDate, Boolean> = dateListToLocalDateMap(dateList)
     val diaryMap: Map<String, Diary> = diaryList.associateBy { it.dateID }
 
     // 1. 다이얼로그(글쓰기 화면)의 표시 여부를 관리하는 상태
     var showWritingScreen by remember { mutableStateOf(false) }
-
+    var writeMenuExpanded by remember { mutableStateOf(false) }
     // 1. SnackbarHostState 생성 및 기억
     // 스낵바를 표시/숨김 상태를 제어하는 핵심 객체
     val snackbarHostState = remember { SnackbarHostState() }
@@ -181,14 +198,43 @@ fun MainScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
 
-                Calendar(localDateMap, diaryMap)
+                Calendar(dateViewModel, selectedDate, localDateMap, diaryMap)
 
                 Row {
                     Button(onClick = { showWritingScreen = true }) {
                         Text("오늘의 일기쓰기")
                     }
-                    Button(onClick = { navController.navigate(Screen.SCHEDULE) }) {
-                        Text("현재 날짜에 일정 추가")
+                    Spacer(Modifier.width(16.dp))
+                    Column(modifier = Modifier.wrapContentSize(Alignment.TopStart)) {
+                        // 2. 메뉴를 여는 버튼
+                        Button(onClick = { writeMenuExpanded = true }) {
+                            Text("작성")
+                        }
+
+                        // 3. 드롭다운 메뉴
+                        DropdownMenu(
+                            expanded = writeMenuExpanded, // 확장 상태 전달
+                            onDismissRequest = { writeMenuExpanded = false } // 메뉴 밖을 누르면 닫기
+                        ) {
+
+                            DropdownMenuItem(
+                                text = { Text("현재 날짜 일기 작성") },
+                                onClick = {
+                                    // 항목 1 선택 시 실행할 로직
+                                    writeMenuExpanded = false // 선택 후 메뉴 닫기
+                                }
+                            )
+
+                            DropdownMenuItem(
+                                text = { Text("현재 날짜 일정 작성") },
+                                onClick = {
+                                    // 항목 1 선택 시 실행할 로직
+                                    navController.navigate(toScheduleWriteScreen(-1) )
+                                    writeMenuExpanded = false // 선택 후 메뉴 닫기
+                                }
+                            )
+                            // ... 필요한 만큼 항목 추가
+                        }
                     }
                 }
             }
@@ -226,9 +272,67 @@ fun MainScreen(
 @Composable
 fun ScheduleWriteScreen(
     navController: NavController,
-    dateViewModel: DateViewModel = hiltViewModel(),
+    dateViewModel: DateViewModel,
+    scheduleViewModel: ScheduleViewModel,
+    scheduleID: Int?
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
+    val selectedDate = remember { dateViewModel.selectedDate.value }
+    val dtf = DateTimeFormatter.ofPattern("yyyy년 MM월 dd일")
+    val timeDtf = remember { DateTimeFormatter.ofPattern("a h:mm", Locale.getDefault()) }
+    val timesaveDtf = remember { DateTimeFormatter.ofPattern("hh:mm", Locale.getDefault()) }
+    val isDateIDAdded by dateViewModel.isDateAdded.collectAsState()
+
+    var showTimePicker by remember { mutableStateOf(false) }
+    var selectedTime by remember { mutableStateOf(LocalTime.of(0,0)) }
+    var title by remember { mutableStateOf("") }
+    var content by remember { mutableStateOf("") }
+    var alarmFlag by remember { mutableStateOf(false) }
+
+    val writeOrModify = if (scheduleID == -1) true else false
+    // true : write, false : Modify
+
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(isDateIDAdded) {
+        isDateIDAdded?.let { isSuccess ->
+            val message = if (isSuccess) {
+                "dateID 추가 성공"
+            } else {
+                "dateID 추가 실패 (중복)"
+            }
+
+            // isAddedResult가 null이 아닐 때만 스낵바를 띄웁니다.
+            scope.launch {
+                snackbarHostState.showSnackbar(
+                    message = message,
+                    actionLabel = "확인",
+                    duration = SnackbarDuration.Short
+                )
+                // 필요하다면 다시 null로 초기화하여 다음 상호작용을 준비
+                // viewModel._isDateAdded.value = null (ViewModel 내부에서 처리 권장
+                dateViewModel.setIsDateAddedNull()
+            }
+        }
+    }
+
+    // ⏰ 시간 선택 다이얼로그 표시 로직
+    if (showTimePicker) {
+        // 💡 Android TimePickerDialog 생성
+        // onTimeSet: 사용자가 '확인'을 눌렀을 때 호출됨
+        TimePickerDialog(
+            context,
+            { _, hour: Int, minute: Int ->
+                // 4. 시간이 설정되면 상태 업데이트
+                selectedTime = LocalTime.of(hour, minute)
+                showTimePicker = false // 다이얼로그 숨김
+            },
+            selectedTime.hour, // 초기 시(Hour) 값
+            selectedTime.minute, // 초기 분(Minute) 값
+            false // 24시간제 사용 여부 (true: 24h, false: 12h)
+        ).show()
+    }
 
     Scaffold(
         topBar = {
@@ -237,7 +341,27 @@ fun ScheduleWriteScreen(
                 // Surface의 색상을 TopAppBar의 기본 색상(surface)과 일치시킵니다.
                 color = MaterialTheme.colorScheme.surface
             ) {
-                TopAppBar(title = { Text("일정 작성") })
+                TopAppBar(title = { Text("일정 작성") },
+                    actions = { Box(
+                        modifier = Modifier.aspectRatio(1f)
+                            .clickable( onClick = {
+                                dateViewModel.addNewDate(dateViewModel.createDateID(selectedDate!!))
+                                scheduleViewModel.addNewSchedule(dateViewModel.createDateID(selectedDate), title, content,
+                                    alarmFlag,
+                                    selectedTime.format(timesaveDtf))
+                                    navController.navigate(Screen.MAIN) {
+                                        popUpTo("scheduleWrite_screen") { // 메인화면으로 돌아갔는데 다시 뒤로가기 가능. 해결 필요.
+                                            inclusive = true
+                                        }
+                                    }
+                                                  },
+                                enabled = title.isNotBlank()),
+                        contentAlignment = Alignment.Center
+                    ) {
+                            Text("저장")
+                    }
+                    }
+                )
             }
         },
         snackbarHost = {
@@ -256,7 +380,139 @@ fun ScheduleWriteScreen(
                 // horizontalAlignment: 수평 방향 정렬을 가운데로 맞춥니다.
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-
+                Row {
+                    Box(Modifier.fillMaxWidth(0.25f)
+                        .height(80.dp)
+                        .clickable(onClick = {}),
+                        contentAlignment = Alignment.Center) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize(0.5f)
+                                .aspectRatio(1f),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                fontSize = 16.sp,
+                                text = "날짜")
+                        }
+                    }
+                    Box(Modifier.fillMaxWidth()
+                        .height(80.dp)
+                        .clickable(onClick = {}),
+                        contentAlignment = Alignment.Center) {
+                        Text(text = selectedDate!!.format(dtf))
+                    }
+                }
+                HorizontalDivider(Modifier.fillMaxWidth(0.9f), DividerDefaults.Thickness, DividerDefaults.color)
+                Row {
+                    Box(Modifier.fillMaxWidth(0.25f)
+                        .height(80.dp),
+                        contentAlignment = Alignment.Center) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize(0.5f)
+                                .aspectRatio(1f),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                fontSize = 16.sp,
+                                text = "시간")
+                        }
+                    }
+                    Box(Modifier.fillMaxWidth()
+                        .height(80.dp)
+                        .clickable(onClick = {showTimePicker = true}),
+                        contentAlignment = Alignment.Center) {
+                        Text(text = "${selectedTime.format(timeDtf)}")
+                    }
+                }
+                HorizontalDivider(Modifier.fillMaxWidth(0.9f), DividerDefaults.Thickness, DividerDefaults.color)
+                Row {
+                    Box(Modifier.fillMaxWidth(0.25f)
+                        .height(80.dp),
+                        contentAlignment = Alignment.Center) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize(0.5f)
+                                .aspectRatio(1f),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                fontSize = 16.sp,
+                                text = "일정명")
+                        }
+                    }
+                    Box(Modifier.fillMaxWidth()
+                        .height(80.dp),
+                        contentAlignment = Alignment.Center) {
+                        TextField(
+                            value = title, // 2. 현재 상태 값을 TextField에 표시
+                            onValueChange = { newValue ->
+                                // 3. 사용자가 입력할 때마다 상태 값을 새로운 값으로 업데이트
+                                title = newValue
+                            },
+                            singleLine = true
+                        )
+                    }
+                }
+                HorizontalDivider(Modifier.fillMaxWidth(0.9f), DividerDefaults.Thickness, DividerDefaults.color)
+                Row {
+                    Box(Modifier.fillMaxWidth(0.25f)
+                        .height(160.dp),
+                        contentAlignment = Alignment.Center) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize(0.5f)
+                                .aspectRatio(1f),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                fontSize = 16.sp,
+                                text = "메모")
+                        }
+                    }
+                    Box(Modifier.fillMaxWidth()
+                        .height(160.dp),
+                        contentAlignment = Alignment.Center) {
+                        TextField(
+                            modifier = Modifier.fillMaxHeight(0.9f),
+                            value = content, // 2. 현재 상태 값을 TextField에 표시
+                            onValueChange = { newValue ->
+                                // 3. 사용자가 입력할 때마다 상태 값을 새로운 값으로 업데이트
+                                content = newValue
+                            }
+                        )
+                    }
+                }
+                HorizontalDivider(Modifier.fillMaxWidth(0.9f), DividerDefaults.Thickness, DividerDefaults.color)
+                Row {
+                    Box(Modifier.fillMaxWidth(0.25f)
+                        .height(80.dp),
+                        contentAlignment = Alignment.Center) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize(0.5f)
+                                .aspectRatio(1f),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                fontSize = 16.sp,
+                                text = "알림")
+                        }
+                    }
+                    Box(Modifier.fillMaxWidth()
+                        .height(80.dp),
+                        contentAlignment = Alignment.Center) {
+                        Checkbox(
+                            checked = alarmFlag, // 2. 현재 상태 값(true/false)을 반영
+                            onCheckedChange = { newCheckedState ->
+                                // 3. 사용자가 클릭할 때마다 상태 값을 토글 (새로운 값으로 업데이트)
+                                alarmFlag = newCheckedState
+                            }
+                        )
+                    }
+                }
+                HorizontalDivider(Modifier.fillMaxWidth(0.9f), DividerDefaults.Thickness, DividerDefaults.color)
             }
         }
     )
@@ -342,7 +598,7 @@ fun DaysOfWeekTitle(daysOfWeek: List<DayOfWeek>) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun Calendar(localDateMap : Map<LocalDate, Boolean>, diaryMap: Map<String, Diary>) {
+fun Calendar(dateViewModel: DateViewModel, selectedDate : LocalDate?, localDateMap : Map<LocalDate, Boolean>, diaryMap: Map<String, Diary>) {
     val currentMonth = remember { YearMonth.now() }
     val startMonth = remember { currentMonth.minusMonths(100) } // Adjust as needed
     val endMonth = remember { currentMonth.plusMonths(100) } // Adjust as needed
@@ -353,6 +609,7 @@ fun Calendar(localDateMap : Map<LocalDate, Boolean>, diaryMap: Map<String, Diary
     val endDate = remember { currentMonth.plusMonths(100).atEndOfMonth() } // Adjust as needed
     var showDiaryListScreen by remember { mutableStateOf(false) }
     val dtf = DateTimeFormatter.ofPattern("yyyyMMdd")
+    val titleDtf = DateTimeFormatter.ofPattern("yyyy년 MM월")
 
     val state = rememberCalendarState(
         startMonth = startMonth,
@@ -371,7 +628,6 @@ fun Calendar(localDateMap : Map<LocalDate, Boolean>, diaryMap: Map<String, Diary
 
     val visibleMonth = rememberFirstMostVisibleMonth(state, viewportPercent = 90f)
     val coroutineScope = rememberCoroutineScope()
-    var selectedDate by rememberSaveable { mutableStateOf<LocalDate?>(LocalDate.now()) }
 
     Column(
         // modifier: UI 요소의 크기, 여백 등을 설정합니다.
@@ -383,7 +639,7 @@ fun Calendar(localDateMap : Map<LocalDate, Boolean>, diaryMap: Map<String, Diary
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // 3. Text: 화면에 숫자를 표시하는 위젯입니다.
-        Text(text = visibleMonth.yearMonth.toString(), fontSize = 22.sp)
+        Text(text = visibleMonth.yearMonth.format(titleDtf), fontSize = 22.sp)
 
         Spacer(modifier = Modifier.height(12.dp)) // 사이에 공간을 둡니다.
         DaysOfWeekTitle(daysOfWeek = daysOfWeek)
@@ -396,7 +652,7 @@ fun Calendar(localDateMap : Map<LocalDate, Boolean>, diaryMap: Map<String, Diary
                 state = state,
                 dayContent = { day ->
                     Day(day, isSelected = selectedDate == day.date, hasDate = localDateMap[day.date]?:false) { day ->
-                        selectedDate = day.date
+                        dateViewModel.setSelectedDate(day.date)
                         coroutineScope.launch {
                             weekState.animateScrollToDay(WeekDay(day.date.minusDays(3), WeekDayPosition.RangeDate))
                         }
@@ -408,7 +664,7 @@ fun Calendar(localDateMap : Map<LocalDate, Boolean>, diaryMap: Map<String, Diary
             state = weekState,
             dayContent = { day ->
                 weekDay (day, isSelected = selectedDate == day.date) { day ->
-                    selectedDate = day.date
+                    dateViewModel.setSelectedDate(day.date)
                     coroutineScope.launch {
                         weekState.animateScrollToDay(WeekDay(day.date.minusDays(3), WeekDayPosition.RangeDate))
                     }
@@ -622,6 +878,11 @@ private fun CalendarLayoutInfo.firstMostVisibleMonth(viewportPercent: Float = 50
         }?.month
     }
 }
+
+fun toScheduleWriteScreen(scheduleID: Int): String {
+    return "scheduleWrite_screen/$scheduleID"
+}
+
 //@Preview(showBackground = true)
 //@Composable
 //fun MainScreenPreview() {

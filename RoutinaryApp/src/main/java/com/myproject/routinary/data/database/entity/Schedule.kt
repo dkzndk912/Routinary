@@ -23,5 +23,7 @@ data class Schedule(
     val dateID: String,
 
     val scheduleTtile: String,
-    val scheduleContent: String
+    val scheduleContent: String,
+    val alarmAllow: Boolean = false,
+    val alarmTime: String = "00:00"
 )

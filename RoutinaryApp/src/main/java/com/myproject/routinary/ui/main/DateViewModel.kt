@@ -16,6 +16,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 import java.text.SimpleDateFormat
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.Date
 import javax.inject.Inject
 
@@ -32,7 +34,9 @@ class DateViewModel @Inject constructor (private val repository: DateRepository)
         )
 
     private val _isDateAdded = MutableStateFlow<Boolean?>(null)
+    private val _selectedDate = MutableStateFlow<LocalDate?>(LocalDate.now())
     val isDateAdded: StateFlow<Boolean?> = _isDateAdded.asStateFlow()
+    val selectedDate: StateFlow<LocalDate?> = _selectedDate.asStateFlow()
 
 
     fun createDateID() : String {
@@ -40,6 +44,14 @@ class DateViewModel @Inject constructor (private val repository: DateRepository)
         val sdf = SimpleDateFormat("yyyyMMdd")
 
         val dateID = sdf.format(date)
+
+        return dateID
+    }
+
+    fun createDateID(date: LocalDate) : String {
+        val dtf = DateTimeFormatter.ofPattern("yyyyMMdd")
+
+        val dateID = date.format(dtf)
 
         return dateID
     }
@@ -68,4 +80,9 @@ class DateViewModel @Inject constructor (private val repository: DateRepository)
     fun setIsDateAddedNull() {
         _isDateAdded.value = null
     }
+
+    fun setSelectedDate(date: LocalDate) {
+        _selectedDate.value = date
+    }
+
 }

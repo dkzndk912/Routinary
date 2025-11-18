@@ -28,7 +28,7 @@ class ScheduleViewModel @Inject constructor (private val repository: ScheduleRep
 
     // 💡 1. Flow를 Compose State로 변환 (StateFlow나 LiveData 사용 가능)
     // 이 상태를 Compose에서 관찰(collectAsState)하여 UI에 반영합니다.
-    val allDiaries: StateFlow<List<Schedule>> = repository.allSchedules
+    val allSchedules: StateFlow<List<Schedule>> = repository.allSchedules
         .stateIn(
             scope = viewModelScope, // ViewModel의 생명 주기에 맞게 동작하도록 설정
             started = SharingStarted.WhileSubscribed(5000), // 구독자가 있을 때 활성화
@@ -36,12 +36,21 @@ class ScheduleViewModel @Inject constructor (private val repository: ScheduleRep
         )
 
     // 💡 2. 사용자 이벤트를 처리하는 함수
-    fun addNewSchedule(dateID : String, title : String, content : String) {
+    fun addNewSchedule(dateID : String, title : String, content : String, allowFlag: Boolean, alarmTime: String) {
         // 비동기 작업을 위해 viewModelScope 코루틴을 사용
         viewModelScope.launch {
                 val newSchedule = Schedule(dateID = dateID, scheduleTtile = title, scheduleContent = content)
                 // Repository의 insert 함수는 suspend 함수여야 합니다.
                 repository.insert(newSchedule)
+        }
+    }
+
+    fun updateSchedule(scheduleID: Int, dateID : String, title : String, content : String, allowFlag: Boolean, alarmTime: String) {
+        // 비동기 작업을 위해 viewModelScope 코루틴을 사용
+        viewModelScope.launch {
+            val newSchedule = Schedule(scheduleID = scheduleID, dateID =  dateID, scheduleTtile = title, scheduleContent = content, alarmAllow = allowFlag, alarmTime = alarmTime)
+            // Repository의 insert 함수는 suspend 함수여야 합니다.
+            repository.insert(newSchedule)
         }
     }
 

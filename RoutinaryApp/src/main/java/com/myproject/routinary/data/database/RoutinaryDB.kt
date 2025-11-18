@@ -19,7 +19,7 @@ import com.myproject.routinary.data.database.entity.Schedule
         Diary::class,
         Schedule::class
                ], // 💡 1. 포함할 모든 Entity 클래스 목록
-    version = 4,                           // 💡 2. 데이터베이스 버전 관리
+    version = 5,                           // 💡 2. 데이터베이스 버전 관리
     exportSchema = false                 // (선택 사항) 스키마 내보내기 설정
 )
 // 2. RoomDatabase를 상속받는 추상 클래스로 정의

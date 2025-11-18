@@ -18,7 +18,7 @@ class ScheduleRepository @Inject constructor(private val scheduleDao: ScheduleDa
     suspend fun insert(schedule: Schedule) : Boolean {
         delay(10L)
         if (null != scheduleDao.getParentDateIDById(schedule.dateID)) {
-            if (scheduleDao.hasDateID(schedule.dateID)) {
+            if (scheduleDao.hasDateID(schedule.dateID) and scheduleDao.hasScheduleID(schedule.scheduleID)) {
                 update(schedule)
                 return false
             } else {
@@ -32,7 +32,9 @@ class ScheduleRepository @Inject constructor(private val scheduleDao: ScheduleDa
     }
 
     suspend fun update(schedule: Schedule) {
-        scheduleDao.update(schedule.dateID, schedule.scheduleTtile, schedule.scheduleContent)
+        scheduleDao.update(schedule.dateID, schedule.scheduleTtile,
+            schedule.scheduleContent, schedule.alarmAllow,
+            schedule.alarmTime)
     }
 
     suspend fun deleteAll() {

@@ -41,8 +41,11 @@ interface ScheduleDao {
     @Query("SELECT EXISTS(SELECT 1 FROM Schedule WHERE dateID = :id)")
     suspend fun hasDateID(id: String): Boolean
 
-    @Query("UPDATE Schedule SET scheduleTtile = :newTitle, scheduleContent = :newContent WHERE dateID = :id")
-    suspend fun update(id: String, newTitle: String, newContent: String): Int
+    @Query("SELECT EXISTS(SELECT 1 FROM Schedule WHERE scheduleID = :id)")
+    suspend fun hasScheduleID(id: Int): Boolean
+
+    @Query("UPDATE Schedule SET scheduleTtile = :newTitle, scheduleContent = :newContent, alarmAllow = :newFlag, alarmTime = :newTime WHERE dateID = :id")
+    suspend fun update(id: String, newTitle: String, newContent: String, newFlag: Boolean, newTime: String): Int
 
     // @Update, @Delete 등 다른 어노테이션도 사용 가능
 }
