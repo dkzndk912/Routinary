@@ -39,7 +39,7 @@ class ScheduleViewModel @Inject constructor (private val repository: ScheduleRep
     fun addNewSchedule(dateID : String, title : String, content : String, allowFlag: Boolean, alarmTime: String) {
         // 비동기 작업을 위해 viewModelScope 코루틴을 사용
         viewModelScope.launch {
-                val newSchedule = Schedule(dateID = dateID, scheduleTtile = title, scheduleContent = content)
+                val newSchedule = Schedule(dateID = dateID, scheduleTtile = title, scheduleContent = content, alarmAllow = allowFlag, alarmTime = alarmTime)
                 // Repository의 insert 함수는 suspend 함수여야 합니다.
                 repository.insert(newSchedule)
         }

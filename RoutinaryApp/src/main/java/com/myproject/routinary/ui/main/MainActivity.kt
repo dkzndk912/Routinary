@@ -21,6 +21,7 @@ import com.myproject.routinary.ui.theme.RoutinerTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -31,6 +32,7 @@ import androidx.compose.material3.DatePickerDefaults.dateFormatter
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -57,6 +59,7 @@ import com.kizitonwose.calendar.compose.*
 import com.kizitonwose.calendar.compose.weekcalendar.rememberWeekCalendarState
 import com.myproject.routinary.data.database.entity.Diary
 import com.myproject.routinary.data.database.entity.RoutinaryDate
+import com.myproject.routinary.data.database.entity.Schedule
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.filterNotNull
@@ -132,11 +135,13 @@ fun MainScreen(
 //     userList의 값이 변경되면 이 Composable이 자동으로 재구성(Recompose)됩니다.
     val dateList: List<RoutinaryDate> by dateViewModel.allDates.collectAsStateWithLifecycle()
     val diaryList: List<Diary> by diaryViewModel.allDiaries.collectAsStateWithLifecycle()
+    val scheduleList: List<Schedule> by scheduleViewModel.allSchedules.collectAsStateWithLifecycle()
     val isDateIDAdded by dateViewModel.isDateAdded.collectAsState()
     val selectedDate by dateViewModel.selectedDate.collectAsStateWithLifecycle()
 
     val localDateMap: Map<LocalDate, Boolean> = dateListToLocalDateMap(dateList)
     val diaryMap: Map<String, Diary> = diaryList.associateBy { it.dateID }
+    val scheduleMap: Map<String, List<Schedule>> = scheduleList.groupBy { it.dateID }
 
     // 1. 다이얼로그(글쓰기 화면)의 표시 여부를 관리하는 상태
     var showWritingScreen by remember { mutableStateOf(false) }
@@ -198,7 +203,7 @@ fun MainScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
 
-                Calendar(dateViewModel, selectedDate, localDateMap, diaryMap)
+                Calendar(dateViewModel, selectedDate, localDateMap, diaryMap, scheduleMap)
 
                 Row {
                     Button(onClick = { showWritingScreen = true }) {
@@ -598,7 +603,7 @@ fun DaysOfWeekTitle(daysOfWeek: List<DayOfWeek>) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun Calendar(dateViewModel: DateViewModel, selectedDate : LocalDate?, localDateMap : Map<LocalDate, Boolean>, diaryMap: Map<String, Diary>) {
+fun Calendar(dateViewModel: DateViewModel, selectedDate : LocalDate?, localDateMap : Map<LocalDate, Boolean>, diaryMap: Map<String, Diary>, scheduleMap: Map<String, List<Schedule>>) {
     val currentMonth = remember { YearMonth.now() }
     val startMonth = remember { currentMonth.minusMonths(100) } // Adjust as needed
     val endMonth = remember { currentMonth.plusMonths(100) } // Adjust as needed
@@ -610,6 +615,8 @@ fun Calendar(dateViewModel: DateViewModel, selectedDate : LocalDate?, localDateM
     var showDiaryListScreen by remember { mutableStateOf(false) }
     val dtf = DateTimeFormatter.ofPattern("yyyyMMdd")
     val titleDtf = DateTimeFormatter.ofPattern("yyyy년 MM월")
+    // val selectedDateScheduleList: List<Schedule> by remember {mutableStateOf(scheduleMap[dateViewModel.createDateID(dateViewModel.selectedDate.value!!)]?:listOf())}
+    val selectedDateScheduleList: List<Schedule> =scheduleMap[dateViewModel.createDateID(dateViewModel.selectedDate.value!!)]?:listOf()
 
     val state = rememberCalendarState(
         startMonth = startMonth,
@@ -707,6 +714,39 @@ fun Calendar(dateViewModel: DateViewModel, selectedDate : LocalDate?, localDateM
                         .clickable(onClick = {showDiaryListScreen = true}),
                         contentAlignment = Alignment.Center) {
                         Text(text = diaryMap[selectedDate?.format(dtf)?:""]?.diaryTitle?:"아직 일기가 없습니다.",)
+                    }
+                }
+            }
+
+            items(
+                selectedDateScheduleList
+            ) { item ->
+                HorizontalDivider(Modifier.fillMaxWidth(0.9f), DividerDefaults.Thickness, DividerDefaults.color)
+                Row {
+                    Box(Modifier.fillMaxWidth(0.25f)
+                        .height(80.dp)
+                        .clickable(onClick = {}),
+                        contentAlignment = Alignment.Center) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize(0.5f)
+                                .aspectRatio(1f)
+                                .clip(CircleShape)
+                                .background(color = Color.Yellow)
+                                .border(
+                                    shape = CircleShape,
+                                    width = 2.dp,
+                                    color = Color.LightGray),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(text = "일정")
+                        }
+                    }
+                    Box(Modifier.fillMaxWidth()
+                        .height(80.dp)
+                        .clickable(onClick = {showDiaryListScreen = true}),
+                        contentAlignment = Alignment.Center) {
+                        Text(text = item.scheduleTtile)
                     }
                 }
             }
