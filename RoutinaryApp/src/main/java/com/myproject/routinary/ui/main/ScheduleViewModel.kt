@@ -26,6 +26,8 @@ import javax.inject.Inject
 @HiltViewModel
 class ScheduleViewModel @Inject constructor (private val repository: ScheduleRepository) : ViewModel() {
 
+    private val _isScheduleAdded = MutableStateFlow<Boolean?>(null)
+    val isScheduleAdded: StateFlow<Boolean?> = _isScheduleAdded.asStateFlow()
     // 💡 1. Flow를 Compose State로 변환 (StateFlow나 LiveData 사용 가능)
     // 이 상태를 Compose에서 관찰(collectAsState)하여 UI에 반영합니다.
     val allSchedules: StateFlow<List<Schedule>> = repository.allSchedules
@@ -35,13 +37,24 @@ class ScheduleViewModel @Inject constructor (private val repository: ScheduleRep
             initialValue = emptyList()
         )
 
+    val maxId: StateFlow<Int?> = repository.maxId
+        .stateIn(
+            scope = viewModelScope, // ViewModel의 생명 주기에 맞게 동작하도록 설정
+            started = SharingStarted.WhileSubscribed(5000), // 구독자가 있을 때 활성화
+            initialValue = 1
+        )
+
     // 💡 2. 사용자 이벤트를 처리하는 함수
     fun addNewSchedule(dateID : String, title : String, content : String, allowFlag: Boolean, alarmTime: String) {
         // 비동기 작업을 위해 viewModelScope 코루틴을 사용
         viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
                 val newSchedule = Schedule(dateID = dateID, scheduleTtile = title, scheduleContent = content, alarmAllow = allowFlag, alarmTime = alarmTime)
                 // Repository의 insert 함수는 suspend 함수여야 합니다.
                 repository.insert(newSchedule)
+            }
+
+            _isScheduleAdded.value = result
         }
     }
 
@@ -58,5 +71,9 @@ class ScheduleViewModel @Inject constructor (private val repository: ScheduleRep
         viewModelScope.launch {
             repository.deleteAll() // Repository에 데이터 삽입 요청
         }
+    }
+
+    fun setIsScheduleAddedNull() {
+        _isScheduleAdded.value = null
     }
 }

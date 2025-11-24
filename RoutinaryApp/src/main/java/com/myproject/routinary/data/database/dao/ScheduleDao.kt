@@ -44,6 +44,9 @@ interface ScheduleDao {
     @Query("SELECT EXISTS(SELECT 1 FROM Schedule WHERE scheduleID = :id)")
     suspend fun hasScheduleID(id: Int): Boolean
 
+    @Query("SELECT MAX(scheduleID) FROM Schedule")
+    fun getMaxNumber(): Flow<Int?>
+
     @Query("UPDATE Schedule SET scheduleTtile = :newTitle, scheduleContent = :newContent, alarmAllow = :newFlag, alarmTime = :newTime WHERE dateID = :id")
     suspend fun update(id: String, newTitle: String, newContent: String, newFlag: Boolean, newTime: String): Int
 

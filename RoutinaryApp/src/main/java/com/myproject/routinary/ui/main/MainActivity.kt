@@ -1,7 +1,18 @@
 package com.myproject.routinary.ui.main
 
+import android.Manifest
+import android.app.Activity
+import android.app.AlarmManager
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.TimePickerDialog
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -45,6 +56,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.core.app.ActivityCompat
+import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -60,6 +74,7 @@ import com.kizitonwose.calendar.compose.weekcalendar.rememberWeekCalendarState
 import com.myproject.routinary.data.database.entity.Diary
 import com.myproject.routinary.data.database.entity.RoutinaryDate
 import com.myproject.routinary.data.database.entity.Schedule
+import com.myproject.routinary.util.ScheduleAlarm
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.filterNotNull
@@ -84,6 +99,59 @@ class MainActivity : ComponentActivity() {
                 AppNavigation()
             }
         }
+        requestNotificationPermission()
+        if (!checkExactAlarmPermission(this)) {
+            requestExactAlarmPermission(this)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // 이 곳에 Activity가 사용자에게 보이고 상호작용할 수 있게 될 때마다 실행하고 싶은 코드를 작성합니다.
+        // 예시: 실시간 위치 정보 업데이트 시작, 카메라 미리보기 시작, 권한 재확인
+        if (!checkExactAlarmPermission(this)) {
+            requestExactAlarmPermission(this)
+        }
+    }
+
+    companion object {
+        private const val NOTIFICATION_PERMISSION_CODE = 101
+    }
+
+    // Android 13 (API 33) 이상에서만 필요
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                // 권한 요청
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    NOTIFICATION_PERMISSION_CODE
+                )
+            }
+        }
+    }
+    private fun checkExactAlarmPermission(context: Context): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) { // Android 12 (S) 이상
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            // ⭐ 정확한 알람 예약 권한이 부여되었는지 확인
+            alarmManager.canScheduleExactAlarms()
+        } else {
+            true // Android 12 미만 버전에서는 항상 true (권한 필요 없음)
+        }
+    }
+    private fun requestExactAlarmPermission(activity: Activity) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                data = Uri.fromParts("package", activity.packageName, null)
+            }
+            activity.startActivity(intent)
+            // 사용자가 설정을 변경하고 돌아왔을 때, onResume()에서 다시 권한을 확인해야 합니다.
+        }
     }
 }
 
@@ -99,6 +167,7 @@ fun AppNavigation() {
     val dateViewModel: DateViewModel = hiltViewModel()
     val diaryViewModel: DiaryViewModel = hiltViewModel()
     val scheduleViewModel: ScheduleViewModel = hiltViewModel()
+    val scheduleAlarm: ScheduleAlarm = ScheduleAlarm()
 
     // 화면(Destination)들을 호스팅하는 영역 정의
     NavHost(
@@ -118,7 +187,7 @@ fun AppNavigation() {
             )
         ) { backStackEntry ->
             val scheduleID : Int? = backStackEntry.arguments?.getInt("scheduleID")?:-1
-            ScheduleWriteScreen(navController = navController,dateViewModel=dateViewModel , scheduleViewModel=scheduleViewModel, scheduleID = scheduleID)
+            ScheduleWriteScreen(navController = navController,dateViewModel=dateViewModel , scheduleViewModel=scheduleViewModel, scheduleID = scheduleID, scheduleAlarm)
         }
     }
 }
@@ -279,14 +348,19 @@ fun ScheduleWriteScreen(
     navController: NavController,
     dateViewModel: DateViewModel,
     scheduleViewModel: ScheduleViewModel,
-    scheduleID: Int?
+    scheduleID: Int?,
+    scheduleAlarm: ScheduleAlarm
 ) {
+    val scheduleList: List<Schedule> by scheduleViewModel.allSchedules.collectAsStateWithLifecycle()
+    val scheduleMaxId: Int? by scheduleViewModel.maxId.collectAsStateWithLifecycle()
+
     val snackbarHostState = remember { SnackbarHostState() }
     val selectedDate = remember { dateViewModel.selectedDate.value }
     val dtf = DateTimeFormatter.ofPattern("yyyy년 MM월 dd일")
     val timeDtf = remember { DateTimeFormatter.ofPattern("a h:mm", Locale.getDefault()) }
-    val timesaveDtf = remember { DateTimeFormatter.ofPattern("hh:mm", Locale.getDefault()) }
+    val timesaveDtf = remember { DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault()) }
     val isDateIDAdded by dateViewModel.isDateAdded.collectAsState()
+    val isScheduleAdded by scheduleViewModel.isScheduleAdded.collectAsState()
 
     var showTimePicker by remember { mutableStateOf(false) }
     var selectedTime by remember { mutableStateOf(LocalTime.of(0,0)) }
@@ -318,6 +392,14 @@ fun ScheduleWriteScreen(
                 // 필요하다면 다시 null로 초기화하여 다음 상호작용을 준비
                 // viewModel._isDateAdded.value = null (ViewModel 내부에서 처리 권장
                 dateViewModel.setIsDateAddedNull()
+            }
+        }
+    }
+    LaunchedEffect(isScheduleAdded) {
+        isScheduleAdded?.let {
+            scope.launch {
+                scheduleAlarm.scheduleAlarmAt(context, selectedTime.hour, selectedTime.minute, title, scheduleMaxId?: 1)
+                scheduleViewModel.setIsScheduleAddedNull()
             }
         }
     }
@@ -922,6 +1004,8 @@ private fun CalendarLayoutInfo.firstMostVisibleMonth(viewportPercent: Float = 50
 fun toScheduleWriteScreen(scheduleID: Int): String {
     return "scheduleWrite_screen/$scheduleID"
 }
+
+
 
 //@Preview(showBackground = true)
 //@Composable
