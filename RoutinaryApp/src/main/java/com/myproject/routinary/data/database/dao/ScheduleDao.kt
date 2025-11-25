@@ -35,6 +35,9 @@ interface ScheduleDao {
     @Query("DELETE FROM Schedule") // 4. 삭제 쿼리
     suspend fun deleteAll()
 
+    @Query("DELETE FROM Schedule where scheduleID = :id") // 4. 삭제 쿼리
+    suspend fun delete(id: Int)
+
     @Query("SELECT dateID FROM RoutinaryDate WHERE dateID = :id LIMIT 1")
     suspend fun getParentDateIDById(id: String): String?
 
@@ -47,8 +50,8 @@ interface ScheduleDao {
     @Query("SELECT MAX(scheduleID) FROM Schedule")
     fun getMaxNumber(): Flow<Int?>
 
-    @Query("UPDATE Schedule SET scheduleTtile = :newTitle, scheduleContent = :newContent, alarmAllow = :newFlag, alarmTime = :newTime WHERE dateID = :id")
-    suspend fun update(id: String, newTitle: String, newContent: String, newFlag: Boolean, newTime: String): Int
+    @Query("UPDATE Schedule SET scheduleTtile = :newTitle, scheduleContent = :newContent, alarmAllow = :newFlag, alarmTime = :newTime WHERE scheduleID = :id")
+    suspend fun update(id: Int, newTitle: String, newContent: String, newFlag: Boolean, newTime: String): Int
 
     // @Update, @Delete 등 다른 어노테이션도 사용 가능
 }

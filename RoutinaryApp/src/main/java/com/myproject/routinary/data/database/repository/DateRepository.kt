@@ -1,6 +1,7 @@
 package com.myproject.routinary.data.database.repository
 
 import androidx.room.Delete
+import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
 
 import com.myproject.routinary.data.database.dao.DateDao
@@ -15,20 +16,20 @@ class DateRepository @Inject constructor(private val dateDao: DateDao) {
 
     // DAO의 삽입 함수를 호출합니다.
     suspend fun insert(date: RoutinaryDate): Boolean {
-        val currentMaxNumber : Int? = dateDao.getMaxNumber()
-        val nextNumber : Int = if (currentMaxNumber == null) {
-            0
-        } else {
-            currentMaxNumber + 1
-        }
-
         if (null == dateDao.getDateIDById(date.dateID)) {
-            val newEntry = date.copy(numbering = nextNumber)
-            dateDao.insertDate(newEntry)
+            dateDao.insertDate(date)
             return true
         } else {
             return false
         }
+    }
+
+    suspend fun plusNumbering(dateID: String) {
+        dateDao.plusNumbering(dateID)
+    }
+
+    suspend fun minusNumbering(dateID: String) {
+        dateDao.minusNumbering(dateID)
     }
 
     suspend fun deleteAll() {

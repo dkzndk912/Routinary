@@ -67,9 +67,22 @@ class ScheduleViewModel @Inject constructor (private val repository: ScheduleRep
     fun updateSchedule(scheduleID: Int, dateID : String, title : String, content : String, allowFlag: Boolean, alarmTime: String) {
         // 비동기 작업을 위해 viewModelScope 코루틴을 사용
         viewModelScope.launch {
-            val newSchedule = Schedule(scheduleID = scheduleID, dateID =  dateID, scheduleTtile = title, scheduleContent = content, alarmAllow = allowFlag, alarmTime = alarmTime)
-            // Repository의 insert 함수는 suspend 함수여야 합니다.
-            repository.insert(newSchedule)
+            val result = withContext(Dispatchers.IO) {
+                val newSchedule = Schedule(scheduleID = scheduleID, dateID =  dateID, scheduleTtile = title, scheduleContent = content, alarmAllow = allowFlag, alarmTime = alarmTime)
+                // Repository의 insert 함수는 suspend 함수여야 합니다.
+                repository.insert(newSchedule)
+            }
+            _isScheduleAdded.value = result
+        }
+    }
+
+    fun delete(scheduleID: Int) {
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                repository.delete(scheduleID) // Repository에 데이터 삽입 요청
+                true
+            }
+            _isScheduleAdded.value = result
         }
     }
 

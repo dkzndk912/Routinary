@@ -5,7 +5,9 @@ import kotlinx.coroutines.flow.Flow
 import com.myproject.routinary.data.database.dao.ScheduleDao
 import com.myproject.routinary.data.database.entity.Diary
 import com.myproject.routinary.data.database.entity.Schedule
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 import javax.inject.Inject
 
@@ -21,11 +23,14 @@ class ScheduleRepository @Inject constructor(private val scheduleDao: ScheduleDa
         if (null != scheduleDao.getParentDateIDById(schedule.dateID)) {
             if (scheduleDao.hasDateID(schedule.dateID) and scheduleDao.hasScheduleID(schedule.scheduleID)) {
                 update(schedule)
-                return false
-            } else {
-                val newEntry = schedule.copy()
-                scheduleDao.insertSchedule(newEntry)
                 return true
+            } else {
+                val result = withContext(Dispatchers.IO) {
+                    val newEntry = schedule.copy()
+                    scheduleDao.insertSchedule(newEntry)
+                    true
+                }
+                return result
             }
         } else {
             return false
@@ -33,9 +38,13 @@ class ScheduleRepository @Inject constructor(private val scheduleDao: ScheduleDa
     }
 
     suspend fun update(schedule: Schedule) {
-        scheduleDao.update(schedule.dateID, schedule.scheduleTtile,
+        scheduleDao.update(schedule.scheduleID, schedule.scheduleTtile,
             schedule.scheduleContent, schedule.alarmAllow,
             schedule.alarmTime)
+    }
+
+    suspend fun delete(schedueId: Int) {
+        scheduleDao.delete(schedueId)
     }
 
     suspend fun deleteAll() {

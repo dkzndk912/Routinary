@@ -13,6 +13,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -63,6 +64,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -210,6 +212,7 @@ fun MainScreen(
     val selectedDate by dateViewModel.selectedDate.collectAsStateWithLifecycle()
 
     val localDateMap: Map<LocalDate, Boolean> = dateListToLocalDateMap(dateList)
+    val dateMap: Map<String, RoutinaryDate> = dateList.associateBy { it.dateID }
     val diaryMap: Map<String, Diary> = diaryList.associateBy { it.dateID }
     val scheduleMap: Map<String, List<Schedule>> = scheduleList.groupBy { it.dateID }
 
@@ -273,7 +276,7 @@ fun MainScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
 
-                Calendar(dateViewModel, selectedDate, localDateMap, diaryMap, scheduleMap)
+                Calendar(dateViewModel, selectedDate, localDateMap, diaryMap, scheduleMap, navController, dateMap)
 
                 Row {
                     Button(onClick = { showWritingScreen = true }) {
@@ -352,60 +355,62 @@ fun ScheduleWriteScreen(
     scheduleID: Int?,
     scheduleAlarm: ScheduleAlarm
 ) {
+    val writeOrModify = if (scheduleID == -1) true else false
+
     val scheduleList: List<Schedule> by scheduleViewModel.allSchedules.collectAsStateWithLifecycle()
     val scheduleMaxId: Int? by scheduleViewModel.maxId.collectAsStateWithLifecycle()
 
+    val scheduleMap: Map<Int, Schedule> = scheduleList.associateBy { it.scheduleID }
+
+    val scheduleBeforeTitle = remember { scheduleMap[scheduleID]?.scheduleTtile }
     val snackbarHostState = remember { SnackbarHostState() }
     val selectedDate = remember { dateViewModel.selectedDate.value }
     val dtf = DateTimeFormatter.ofPattern("yyyy년 MM월 dd일")
     val timeDtf = remember { DateTimeFormatter.ofPattern("a h:mm", Locale.getDefault()) }
     val timesaveDtf = remember { DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault()) }
-    val isDateIDAdded by dateViewModel.isDateAdded.collectAsState()
     val isScheduleAdded by scheduleViewModel.isScheduleAdded.collectAsState()
-
     var showTimePicker by remember { mutableStateOf(false) }
-    var selectedTime by remember { mutableStateOf(LocalTime.of(0,0)) }
-    var title by remember { mutableStateOf("") }
-    var content by remember { mutableStateOf("") }
-    var alarmFlag by remember { mutableStateOf(false) }
 
-    val writeOrModify = if (scheduleID == -1) true else false
+
+    var selectedTime by remember { mutableStateOf(if (writeOrModify) LocalTime.of(0,0) else LocalTime.parse(scheduleMap[scheduleID]!!.alarmTime)) }
+    var title by remember { mutableStateOf(if (writeOrModify) "" else scheduleMap[scheduleID]!!.scheduleTtile) }
+    var content by remember { mutableStateOf(if (writeOrModify) "" else scheduleMap[scheduleID]!!.scheduleContent) }
+    var alarmFlag by remember { mutableStateOf(if (writeOrModify) false else scheduleMap[scheduleID]!!.alarmAllow) }
+
+
+
+
     // true : write, false : Modify
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(isDateIDAdded) {
-        isDateIDAdded?.let { isSuccess ->
-            val message = if (isSuccess) {
-                "dateID 추가 성공"
-            } else {
-                "dateID 추가 실패 (중복)"
-            }
-
-            // isAddedResult가 null이 아닐 때만 스낵바를 띄웁니다.
-            scope.launch {
-                snackbarHostState.showSnackbar(
-                    message = message,
-                    actionLabel = "확인",
-                    duration = SnackbarDuration.Short
-                )
-                // 필요하다면 다시 null로 초기화하여 다음 상호작용을 준비
-                // viewModel._isDateAdded.value = null (ViewModel 내부에서 처리 권장
-                dateViewModel.setIsDateAddedNull()
-            }
-        }
-    }
-
-    LaunchedEffect(scheduleMaxId) {
+    LaunchedEffect(isScheduleAdded) {
         isScheduleAdded?.let {
             scope.launch {
-                delay(10)
-                scheduleAlarm.scheduleAlarmAt(context, selectedTime.hour, selectedTime.minute, title, scheduleMaxId?: 1)
+                if (alarmFlag) {
+                    if (writeOrModify) {
+                        scheduleAlarm.scheduleAlarmAt(context, selectedTime.hour, selectedTime.minute, title, scheduleMaxId?: 1)
+                    } else {
+                        scheduleAlarm.scheduleAlarmAt(context, selectedTime.hour, selectedTime.minute, title, scheduleID!!)
+                    }
+                } else {
+                    if (!writeOrModify) {
+                        scheduleAlarm.cancelAlarm(context, scheduleID!!, scheduleBeforeTitle!! )
+                    }
+                }
+
                 scheduleViewModel.setIsScheduleAddedNull()
+
+                navController.navigate(Screen.MAIN) {
+                    popUpTo(navController.graph.findStartDestination().id) {
+                        inclusive = true
+                    }
+                }
             }
         }
     }
+
 
     // ⏰ 시간 선택 다이얼로그 표시 로직
     if (showTimePicker) {
@@ -431,19 +436,34 @@ fun ScheduleWriteScreen(
                 // Surface의 색상을 TopAppBar의 기본 색상(surface)과 일치시킵니다.
                 color = MaterialTheme.colorScheme.surface
             ) {
-                TopAppBar(title = { Text("일정 작성") },
-                    actions = { Box(
+                TopAppBar(title = { Text(if (writeOrModify) "일정 작성" else "일정 수정") },
+                    actions = {
+                        if (!writeOrModify) {
+                            Box(
+                                modifier = Modifier.aspectRatio(1f)
+                                    .clickable( onClick = {
+                                        scheduleViewModel.delete(scheduleID!!)
+                                        dateViewModel.minusNumbering(dateViewModel.createDateID(selectedDate!!))
+                                    }),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("삭제")
+                            }
+                        }
+
+                        Box(
                         modifier = Modifier.aspectRatio(1f)
                             .clickable( onClick = {
-                                dateViewModel.addNewDate(dateViewModel.createDateID(selectedDate!!))
-                                scheduleViewModel.addNewSchedule(dateViewModel.createDateID(selectedDate), title, content,
-                                    alarmFlag,
-                                    selectedTime.format(timesaveDtf))
-                                    navController.navigate(Screen.MAIN) {
-                                        popUpTo("scheduleWrite_screen") { // 메인화면으로 돌아갔는데 다시 뒤로가기 가능. 해결 필요.
-                                            inclusive = true
-                                        }
-                                    }
+                                if (writeOrModify) {
+                                    dateViewModel.addNewDate(dateViewModel.createDateID(selectedDate!!))
+                                    scheduleViewModel.addNewSchedule(dateViewModel.createDateID(selectedDate), title, content,
+                                        alarmFlag,
+                                        selectedTime.format(timesaveDtf))
+                                } else {
+                                    scheduleViewModel.updateSchedule(scheduleID!!, dateViewModel.createDateID(selectedDate!!), title, content,
+                                        alarmFlag,
+                                        selectedTime.format(timesaveDtf))
+                                }
                                                   },
                                 enabled = title.isNotBlank()),
                         contentAlignment = Alignment.Center
@@ -688,7 +708,7 @@ fun DaysOfWeekTitle(daysOfWeek: List<DayOfWeek>) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun Calendar(dateViewModel: DateViewModel, selectedDate : LocalDate?, localDateMap : Map<LocalDate, Boolean>, diaryMap: Map<String, Diary>, scheduleMap: Map<String, List<Schedule>>) {
+fun Calendar(dateViewModel: DateViewModel, selectedDate : LocalDate?, localDateMap : Map<LocalDate, Boolean>, diaryMap: Map<String, Diary>, scheduleMap: Map<String, List<Schedule>>, navController: NavController, dateMap: Map<String, RoutinaryDate>) {
     val currentMonth = remember { YearMonth.now() }
     val startMonth = remember { currentMonth.minusMonths(100) } // Adjust as needed
     val endMonth = remember { currentMonth.plusMonths(100) } // Adjust as needed
@@ -743,7 +763,9 @@ fun Calendar(dateViewModel: DateViewModel, selectedDate : LocalDate?, localDateM
             HorizontalCalendar(
                 state = state,
                 dayContent = { day ->
-                    Day(day, isSelected = selectedDate == day.date, hasDate = localDateMap[day.date]?:false) { day ->
+                    Day(day, isSelected = selectedDate == day.date, hasDate = localDateMap[day.date] ?: false && ((dateMap[day.date.format(dtf)]?.numbering
+                        ?: 0) > 0)
+                    ) { day ->
                         dateViewModel.setSelectedDate(day.date)
                         coroutineScope.launch {
                             weekState.animateScrollToDay(WeekDay(day.date.minusDays(3), WeekDayPosition.RangeDate))
@@ -829,7 +851,9 @@ fun Calendar(dateViewModel: DateViewModel, selectedDate : LocalDate?, localDateM
                     }
                     Box(Modifier.fillMaxWidth()
                         .height(80.dp)
-                        .clickable(onClick = {showDiaryListScreen = true}),
+                        .clickable(onClick = {
+                            navController.navigate(toScheduleWriteScreen(item.scheduleID))
+                        }),
                         contentAlignment = Alignment.Center) {
                         Text(text = item.scheduleTtile)
                     }

@@ -15,8 +15,11 @@ interface DateDao {
     @Query("SELECT * FROM RoutinaryDate ORDER BY dateID asc") // 3. 조회 쿼리 (SQL 직접 작성)
     fun getAllDates(): Flow<List<RoutinaryDate>> // Flow는 데이터 변경 시 실시간으로 알림을 받을 수 있게 함
 
-    @Query("SELECT MAX(numbering) FROM RoutinaryDate")
-    suspend fun getMaxNumber(): Int?
+    @Query("UPDATE ROUTINARYDATE SET numbering = numbering + 1 where dateID = :id")
+    suspend fun plusNumbering(id: String)
+
+    @Query("UPDATE ROUTINARYDATE SET numbering = numbering - 1 where dateID = :id")
+    suspend fun minusNumbering(id: String)
 
     @Query("DELETE FROM RoutinaryDate") // 4. 삭제 쿼리
     suspend fun deleteAll()

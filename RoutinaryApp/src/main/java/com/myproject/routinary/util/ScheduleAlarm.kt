@@ -16,6 +16,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat.getSystemService
 import com.myproject.routinary.R
+import com.myproject.routinary.ui.main.MainActivity
 import java.util.Calendar
 
 class ScheduleAlarm() : BroadcastReceiver() {
@@ -28,6 +29,7 @@ class ScheduleAlarm() : BroadcastReceiver() {
             // ⭐ getStringExtra()를 사용하여 문자열을 꺼냅니다.
             title = it.getStringExtra("title") ?: "일정 이름"
             alarmId = it.getIntExtra("alarmId", -1)
+
         }
         context?.let  {
             // 이전에 구현했던 알림 표시 로직을 호출합니다.
@@ -104,6 +106,28 @@ class ScheduleAlarm() : BroadcastReceiver() {
         }
     }
 
+    fun cancelAlarm(context: Context, alarmId: Int, beforeTitle: String) {
+
+        // 2. 등록 시 사용한 것과 '동일한' Intent 객체를 생성합니다.
+        //    -> 대상 컴포넌트, 액션, 데이터(Extra)가 같아야 합니다.
+        val intent = Intent(context, ScheduleAlarm::class.java).apply {
+            putExtra("title", beforeTitle)
+            putExtra("alarmId", alarmId)
+        }
+
+        // 3. PendingIntent 생성 (취소 목적)
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            alarmId, // ★ 중요: 동일한 요청 코드
+            intent,
+            PendingIntent.FLAG_IMMUTABLE
+        )
+
+        // 4. AlarmManager를 사용하여 취소
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        alarmManager.cancel(pendingIntent) // 동일한 PendingIntent로 취소
+    }
+
     // 채널 생성 로직
     private fun createNotificationChannel(context: Context) {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
@@ -123,11 +147,26 @@ class ScheduleAlarm() : BroadcastReceiver() {
         val channelId = "scheduleAlarm"
         val notificationId = alarmId // 알림을 구분하는 고유 ID
         Log.d("debug", "showed AlarmID : $alarmId ")
+
+        val intent = Intent(context, MainActivity::class.java).apply {
+            Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+
+        // 2. PendingIntent 생성 (미래의 Intent)
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            alarmId, // 요청 코드 (알람 ID와 동일하게 사용하여 구분)
+            intent,
+            // FLAG_IMMUTABLE은 필수. 이전 알림을 업데이트하려면 FLAG_UPDATE_CURRENT 사용 가능.
+            PendingIntent.FLAG_IMMUTABLE
+        )
+
         val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_launcher_foreground) // 알림 아이콘
             .setContentTitle("일정 알림 : $title")
             .setContentText("일정을 확인하세요")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(pendingIntent)
             .setAutoCancel(true)
 
         NotificationManagerCompat.from(context).notify(notificationId, builder.build())

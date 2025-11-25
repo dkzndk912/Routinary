@@ -66,10 +66,24 @@ class DateViewModel @Inject constructor (private val repository: DateRepository)
                 // Repository의 insert 함수는 suspend 함수여야 합니다.
                 repository.insert(newDate)
             }
-
+            repository.plusNumbering(dateID)
             _isDateAdded.value = result
         }
     }
+
+    fun plusNumbering(dateID: String) {
+        viewModelScope.launch {
+            repository.plusNumbering(dateID)
+        }
+    }
+
+    fun minusNumbering(dateID: String) {
+        viewModelScope.launch {
+            repository.minusNumbering(dateID)
+        }
+    }
+
+
 
     fun deleteAll() {
         viewModelScope.launch {
