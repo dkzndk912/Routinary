@@ -17,7 +17,7 @@ class ScheduleRepository @Inject constructor(private val scheduleDao: ScheduleDa
 
     // DAO의 삽입 함수를 호출합니다.
     suspend fun insert(schedule: Schedule) : Boolean {
-        delay(10L)
+        delay(15L)
         if (null != scheduleDao.getParentDateIDById(schedule.dateID)) {
             if (scheduleDao.hasDateID(schedule.dateID) and scheduleDao.hasScheduleID(schedule.scheduleID)) {
                 update(schedule)

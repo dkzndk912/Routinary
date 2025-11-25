@@ -9,6 +9,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.util.Log
 import android.widget.Toast
 import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
@@ -81,7 +82,7 @@ class ScheduleAlarm() : BroadcastReceiver() {
     @RequiresPermission(Manifest.permission.SCHEDULE_EXACT_ALARM)
     fun scheduleAlarmAt(context: Context, hour: Int, minute: Int, title: String, alarmId: Int) {
         val alarmId = alarmId // 고유 알람 ID
-
+        Log.d("debug", "set AlarmID : $alarmId ")
         val calendar = Calendar.getInstance().apply {
             timeInMillis = System.currentTimeMillis()
             set(Calendar.HOUR_OF_DAY, hour)
@@ -121,7 +122,7 @@ class ScheduleAlarm() : BroadcastReceiver() {
     private fun showAlarmNotification(context: Context, title: String, alarmId: Int) {
         val channelId = "scheduleAlarm"
         val notificationId = alarmId // 알림을 구분하는 고유 ID
-
+        Log.d("debug", "showed AlarmID : $alarmId ")
         val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_launcher_foreground) // 알림 아이콘
             .setContentTitle("일정 알림 : $title")

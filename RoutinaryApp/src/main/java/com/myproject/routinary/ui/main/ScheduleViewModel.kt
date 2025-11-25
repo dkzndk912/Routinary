@@ -10,6 +10,7 @@ import com.myproject.routinary.data.database.repository.DiaryRepository
 import com.myproject.routinary.data.database.repository.ScheduleRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 
 import kotlinx.coroutines.flow.SharingStarted
@@ -49,11 +50,16 @@ class ScheduleViewModel @Inject constructor (private val repository: ScheduleRep
         // 비동기 작업을 위해 viewModelScope 코루틴을 사용
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) {
-                val newSchedule = Schedule(dateID = dateID, scheduleTtile = title, scheduleContent = content, alarmAllow = allowFlag, alarmTime = alarmTime)
+                val newSchedule = Schedule(
+                    dateID = dateID,
+                    scheduleTtile = title,
+                    scheduleContent = content,
+                    alarmAllow = allowFlag,
+                    alarmTime = alarmTime
+                )
                 // Repository의 insert 함수는 suspend 함수여야 합니다.
                 repository.insert(newSchedule)
             }
-
             _isScheduleAdded.value = result
         }
     }

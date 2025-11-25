@@ -18,7 +18,7 @@ class DiaryRepository @Inject constructor(private val diaryDao: DiaryDao) {
 
     // DAO의 삽입 함수를 호출합니다.
     suspend fun insert(diary: Diary) : Boolean {
-        delay(10L)
+        delay(25L)
         if (null != diaryDao.getParentDateIDById(diary.dateID)) {
             if (diaryDao.hasDateID(diary.dateID)) {
                 update(diary)

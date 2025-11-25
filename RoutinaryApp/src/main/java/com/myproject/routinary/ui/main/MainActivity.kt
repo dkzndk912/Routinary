@@ -77,6 +77,7 @@ import com.myproject.routinary.data.database.entity.Schedule
 import com.myproject.routinary.util.ScheduleAlarm
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
@@ -395,9 +396,11 @@ fun ScheduleWriteScreen(
             }
         }
     }
-    LaunchedEffect(isScheduleAdded) {
+
+    LaunchedEffect(scheduleMaxId) {
         isScheduleAdded?.let {
             scope.launch {
+                delay(10)
                 scheduleAlarm.scheduleAlarmAt(context, selectedTime.hour, selectedTime.minute, title, scheduleMaxId?: 1)
                 scheduleViewModel.setIsScheduleAddedNull()
             }
