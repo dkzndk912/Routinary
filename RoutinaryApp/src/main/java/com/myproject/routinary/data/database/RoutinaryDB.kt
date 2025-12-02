@@ -6,10 +6,12 @@ import android.content.Context
 import androidx.room.Room // 데이터베이스 빌더 사용을 위해 필요
 import com.myproject.routinary.data.database.dao.DateDao
 import com.myproject.routinary.data.database.dao.DiaryDao
+import com.myproject.routinary.data.database.dao.RoutineDao
 import com.myproject.routinary.data.database.dao.ScheduleDao
 import com.myproject.routinary.data.database.entity.Diary
 
 import com.myproject.routinary.data.database.entity.RoutinaryDate
+import com.myproject.routinary.data.database.entity.Routine
 import com.myproject.routinary.data.database.entity.Schedule
 
 // 1. @Database 어노테이션
@@ -17,9 +19,10 @@ import com.myproject.routinary.data.database.entity.Schedule
     entities = [
         RoutinaryDate::class,
         Diary::class,
-        Schedule::class
+        Schedule::class,
+        Routine::class
                ], // 💡 1. 포함할 모든 Entity 클래스 목록
-    version = 5,                           // 💡 2. 데이터베이스 버전 관리
+    version = 6,                           // 💡 2. 데이터베이스 버전 관리
     exportSchema = false                 // (선택 사항) 스키마 내보내기 설정
 )
 // 2. RoomDatabase를 상속받는 추상 클래스로 정의
@@ -29,6 +32,7 @@ abstract class RoutinaryDB : RoomDatabase() {
     abstract fun dateDao(): DateDao
     abstract fun diaryDao(): DiaryDao
     abstract fun scheduleDao(): ScheduleDao
+    abstract fun routineDao(): RoutineDao
     // abstract fun bookDao(): BookDao // 다른 DAO가 있다면 추가
 
     // 💡 4. 싱글톤 패턴 구현 (가장 중요)

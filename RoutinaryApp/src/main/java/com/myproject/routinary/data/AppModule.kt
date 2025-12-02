@@ -12,6 +12,7 @@ import androidx.room.Room
 import com.myproject.routinary.data.database.RoutinaryDB
 import com.myproject.routinary.data.database.dao.DateDao
 import com.myproject.routinary.data.database.dao.DiaryDao
+import com.myproject.routinary.data.database.dao.RoutineDao
 import com.myproject.routinary.data.database.dao.ScheduleDao
 import com.myproject.routinary.data.database.entity.Schedule
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -48,5 +49,9 @@ object AppModule {
     @Provides
     fun provideScheduleDao(database: RoutinaryDB): ScheduleDao {
         return database.scheduleDao()
+    }
+    @Provides
+    fun provideRoutineDao(database: RoutinaryDB): RoutineDao {
+        return database.routineDao()
     }
 }
